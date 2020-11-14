@@ -3,8 +3,6 @@
 //! ## Example usage
 //!
 //! ```
-//! use tryhard::RetryFutureExt;
-//!
 //! // some async function that can fail
 //! async fn read_file(path: &str) -> Result<String, std::io::Error> {
 //!     // ...
@@ -14,9 +12,9 @@
 //! # futures::executor::block_on(async_try_main()).unwrap();
 //! #
 //! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
-//! let contents = (|| read_file("Cargo.toml"))
+//! let contents = tryhard::retry_fn(|| read_file("Cargo.toml"))
 //!     // retry at most 10 times
-//!     .retry(10)
+//!     .retries(10)
 //!     .await?;
 //!
 //! assert!(contents.contains("tryhard"));
@@ -28,7 +26,6 @@
 //!
 //! ```
 //! use std::time::Duration;
-//! use tryhard::RetryFutureExt;
 //!
 //! # async fn read_file(path: &str) -> Result<String, std::io::Error> {
 //! #     Ok("tryhard".to_string())
@@ -36,8 +33,8 @@
 //! # futures::executor::block_on(async_try_main()).unwrap();
 //! #
 //! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
-//! let contents = (|| read_file("Cargo.toml"))
-//!     .retry(10)
+//! let contents = tryhard::retry_fn(|| read_file("Cargo.toml"))
+//!     .retries(10)
 //!     .exponential_backoff(Duration::from_millis(10))
 //!     .max_delay(Duration::from_secs(1))
 //!     .await?;
@@ -47,34 +44,10 @@
 //! # }
 //! ```
 //!
-//! `.retry` on closures returns a [`RetryFuture`]. You can also construct a [`RetryFuture`] directly
-//! if thats more appropriate:
-//!
-//! ```
-//! use tryhard::RetryFuture;
-//!
-//! # async fn read_file(path: &str) -> Result<String, std::io::Error> {
-//! #     Ok("tryhard".to_string())
-//! # }
-//! # futures::executor::block_on(async_try_main()).unwrap();
-//! #
-//! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
-//! let contents = RetryFuture::new(
-//!     // retry count
-//!     10,
-//!     // closure that produces the future to retry
-//!     || read_file("Cargo.toml"),
-//! ).await?;
-//!
-//! assert!(contents.contains("tryhard"));
-//! # Ok(())
-//! # }
-//! ```
-//!
 //! ## How many times will my future run?
 //!
-//! The future is always run at least once, so if you do `.retry(0)` your future will run once.
-//! If you do `.retry(10)` and your future always fails it'll run 11 times.
+//! The future is always run at least once, so if you do `.retries(0)` your future will run once.
+//! If you do `.retries(10)` and your future always fails it'll run 11 times.
 //!
 //! ## Why do you require a closure?
 //!
@@ -86,8 +59,6 @@
 //! clone instead:
 //!
 //! ```
-//! use tryhard::RetryFutureExt;
-//!
 //! async fn future_with_owned_data(data: Vec<u8>) -> Result<(), std::io::Error> {
 //!     // ...
 //!     # Ok(())
@@ -98,7 +69,7 @@
 //! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
 //! let data: Vec<u8> = vec![1, 2, 3];
 //!
-//! (|| {
+//! tryhard::retry_fn(|| {
 //!     // We need to clone `data` here. Otherwise we would have to move `data` into the closure.
 //!     // `move` closures can only be called once (they only implement `FnOnce`)
 //!     // and therefore cannot be used to create more than one future.
@@ -107,7 +78,7 @@
 //!     async {
 //!         future_with_owned_data(data).await
 //!     }
-//! }).retry(10).await?;
+//! }).retries(10).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -140,7 +111,39 @@ use std::{
 use std::{marker::PhantomData, time::Duration};
 use tokio::time;
 
+/// Create a `RetryFn` which produces retryable futures.
+pub fn retry_fn<F>(f: F) -> RetryFn<F> {
+    RetryFn { f }
+}
+
+/// A type that produces retryable futures.
+#[derive(Debug)]
+pub struct RetryFn<F> {
+    f: F,
+}
+
+impl<F> RetryFn<F> {
+    /// Specify the number of times to retry the future.
+    pub fn retries<Fut, T, E>(self, max_retries: u32) -> RetryFuture<F, Fut, T, E>
+    where
+        F: FnMut() -> Fut,
+        Fut: Future<Output = Result<T, E>>,
+    {
+        RetryFuture {
+            make_future: self.f,
+            attempts_remaining: max_retries,
+            backoff_strategy: BackoffStrategy::None,
+            max_delay: None,
+            state: RetryState::NotStarted,
+            attempt: 0,
+            _marker: PhantomData,
+        }
+    }
+}
+
 /// A retryable future.
+///
+/// Can be created by calling [`retry_fn`](fn.retry_fn.html).
 #[pin_project]
 pub struct RetryFuture<F, Fut, T, E> {
     make_future: F,
@@ -158,20 +161,6 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
 {
-    /// Create a new `RetryFuture` given the max number of times to retry and a closure that
-    /// produces the future to run.
-    pub fn new(max_retries: u32, make_future: F) -> Self {
-        Self {
-            make_future,
-            attempts_remaining: max_retries,
-            backoff_strategy: BackoffStrategy::None,
-            max_delay: None,
-            state: RetryState::NotStarted,
-            attempt: 0,
-            _marker: PhantomData,
-        }
-    }
-
     /// Set the max duration to sleep between each attempt.
     pub fn max_delay(mut self, delay: Duration) -> Self {
         self.max_delay = Some(delay);
@@ -216,15 +205,15 @@ where
     ///
     /// ```
     /// use std::time::Duration;
-    /// use tryhard::{RetryFutureExt, RetryPolicy};
+    /// use tryhard::RetryPolicy;
     ///
     /// # async fn read_file(path: &str) -> Result<String, std::io::Error> {
     /// #     todo!()
     /// # }
     /// #
     /// # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
-    /// (|| read_file("Cargo.toml"))
-    ///     .retry(3)
+    /// tryhard::retry_fn(|| read_file("Cargo.toml"))
+    ///     .retries(3)
     ///     .custom_backoff(|attempt, error| {
     ///         if error.to_string().contains("foo") {
     ///             RetryPolicy::Delay(Duration::from_millis(100))
@@ -346,22 +335,6 @@ pub enum RetryPolicy {
     Break,
 }
 
-/// Extension trait that adds a `retry` method to all `FnMut() -> impl Future<Output = Result<T, E>>`.
-pub trait RetryFutureExt<Fut, T, E>: Sized {
-    /// Construct a retryable future.
-    fn retry(self, max_retries: u32) -> RetryFuture<Self, Fut, T, E>;
-}
-
-impl<F, Fut, T, E> RetryFutureExt<Fut, T, E> for F
-where
-    F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, E>>,
-{
-    fn retry(self, max_retries: u32) -> RetryFuture<Self, Fut, T, E> {
-        RetryFuture::new(max_retries, self)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,7 +343,8 @@ mod tests {
 
     #[tokio::test]
     async fn succeed() {
-        RetryFuture::new(10, || async { Ok::<_, Infallible>(true) })
+        retry_fn(|| async { Ok::<_, Infallible>(true) })
+            .retries(10)
             .await
             .unwrap();
     }
@@ -379,10 +353,11 @@ mod tests {
     async fn retrying_correct_amount_of_times() {
         let counter = AtomicUsize::new(0);
 
-        let err = RetryFuture::new(10, || async {
+        let err = retry_fn(|| async {
             counter.fetch_add(1, Ordering::SeqCst);
             Err::<Infallible, _>("error")
         })
+        .retries(10)
         .await
         .unwrap_err();
 
@@ -394,10 +369,11 @@ mod tests {
     async fn retry_0_times() {
         let counter = AtomicUsize::new(0);
 
-        RetryFuture::new(0, || async {
+        retry_fn(|| async {
             counter.fetch_add(1, Ordering::SeqCst);
             Err::<Infallible, _>("error")
         })
+        .retries(0)
         .await
         .unwrap_err();
 
@@ -411,14 +387,16 @@ mod tests {
         }
 
         let start = Instant::now();
-        RetryFuture::new(10, make_future)
+        retry_fn(make_future)
+            .retries(10)
             .no_backoff()
             .await
             .unwrap_err();
         let time_with_none = start.elapsed();
 
         let start = Instant::now();
-        RetryFuture::new(10, make_future)
+        retry_fn(make_future)
+            .retries(10)
             .fixed_backoff(Duration::from_millis(10))
             .await
             .unwrap_err();
@@ -437,7 +415,7 @@ mod tests {
         async fn some_future() -> Result<(), Infallible> {
             Ok(())
         }
-        assert_send(some_future.retry(10));
+        assert_send(retry_fn(some_future).retries(10));
     }
 
     #[tokio::test]
@@ -451,8 +429,8 @@ mod tests {
             async { Err::<Infallible, _>("foo") }
         };
 
-        let error = make_future
-            .retry(10)
+        let error = retry_fn(make_future)
+            .retries(10)
             .custom_backoff(|n, _| {
                 if n >= 3 {
                     RetryPolicy::Break
