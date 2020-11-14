@@ -107,6 +107,12 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! ## Tokio only for now
+//!
+//! This library currently expects to be used from within a [tokio](https://tokio.rs) runtime. That
+//! is because it makes use of async timers. Feel free to open an issue if you need support for
+//! other runtimes.
 
 #![warn(missing_docs)]
 
