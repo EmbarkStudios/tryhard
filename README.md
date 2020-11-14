@@ -23,7 +23,7 @@ async fn read_file(path: &str) -> Result<String, std::io::Error> {
 }
 ```
 
-The most basic use case. Retry 3 times, with no delay between attempts
+The most basic use case. Retry 10 times, with no delay between attempts
 
 ```rust
 (|| read_file("Cargo.toml")).retry(10).await?;
