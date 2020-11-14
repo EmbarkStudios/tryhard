@@ -82,7 +82,7 @@ jobs:
   # You must add a crates.io API token to your GH secrets called CRATES_IO_TOKEN
   publish:
     name: Publish
-    needs: [test, deny-check, publish-check]
+    needs: [test, publish-check]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
