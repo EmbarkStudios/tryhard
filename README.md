@@ -26,20 +26,20 @@ async fn read_file(path: &str) -> Result<String, std::io::Error> {
 The most basic use case. Retry 10 times, with no delay between attempts
 
 ```rust
-(|| read_file("Cargo.toml")).retry(10).await?;
+tryhard::retry_fn(|| read_file("Cargo.toml")).retries(10).await?;
 ```
 
 You can also retry with a fixed delay between attempts:
 
 ```rust
-(|| read_file("Cargo.toml")).retry(10).fixed(Duration::from_millis(100)).await?;
+tryhard::retry_fn(|| read_file("Cargo.toml")).retries(10).fixed(Duration::from_millis(100)).await?;
 ```
 
 Or exponential backoff, where the delay doubles each time, with a max delay of 1 second:
 
 ```rust
-(|| read_file("Cargo.toml"))
-    .retry(10)
+tryhard::retry_fn(|| read_file("Cargo.toml"))
+    .retries(10)
     .exponential_backoff(Duration::from_millis(10))
     .max_delay(Duration::from_secs(1))
     .await?;
