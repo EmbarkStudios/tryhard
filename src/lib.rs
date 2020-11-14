@@ -3,7 +3,7 @@
 //! ## Example usage
 //!
 //! ```
-//! use tryhard::RetryFuture;
+//! use tryhard::RetryFutureExt;
 //!
 //! // some async function that can fail
 //! async fn read_file(path: &str) -> Result<String, std::io::Error> {
@@ -14,30 +14,10 @@
 //! # futures::executor::block_on(async_try_main()).unwrap();
 //! #
 //! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
-//! let contents = RetryFuture::new(
-//!     // the max number of retries
-//!     10,
-//!     // closure that produces the future to retry
-//!     || read_file("Cargo.toml"),
-//! ).await?;
-//!
-//! assert!(contents.contains("tryhard"));
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! Through `RetryFutureExt` you can call `.retry` directly on a closure:
-//!
-//! ```
-//! use tryhard::RetryFutureExt;
-//!
-//! # async fn read_file(path: &str) -> Result<String, std::io::Error> {
-//! #     Ok("tryhard".to_string())
-//! # }
-//! # futures::executor::block_on(async_try_main()).unwrap();
-//! #
-//! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
-//! let contents = (|| read_file("Cargo.toml")).retry(10).await?;
+//! let contents = (|| read_file("Cargo.toml"))
+//!     // retry at most 10 times
+//!     .retry(10)
+//!     .await?;
 //!
 //! assert!(contents.contains("tryhard"));
 //! # Ok(())
@@ -61,6 +41,30 @@
 //!     .exponential_backoff(Duration::from_millis(10))
 //!     .max_delay(Duration::from_secs(1))
 //!     .await?;
+//!
+//! assert!(contents.contains("tryhard"));
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! `.retry` on closures returns a [`RetryFuture`]. You can also construct a [`RetryFuture`] directly
+//! if thats more appropriate:
+//!
+//! ```
+//! use tryhard::RetryFuture;
+//!
+//! # async fn read_file(path: &str) -> Result<String, std::io::Error> {
+//! #     Ok("tryhard".to_string())
+//! # }
+//! # futures::executor::block_on(async_try_main()).unwrap();
+//! #
+//! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
+//! let contents = RetryFuture::new(
+//!     // retry count
+//!     10,
+//!     // closure that produces the future to retry
+//!     || read_file("Cargo.toml"),
+//! ).await?;
 //!
 //! assert!(contents.contains("tryhard"));
 //! # Ok(())
@@ -108,11 +112,20 @@
 //! # }
 //! ```
 //!
+//! ## Be careful what you retry
+//!
+//! This library is meant to make it straight forward to retry simple futures, such as sending a
+//! single request to some service that occationally fails. If you have some complex operation that
+//! consists of multiple futures each of which can fail, this library might be not appropriate. You
+//! risk repeating the same operation more than once because some later operation keeps failing.
+//!
 //! ## Tokio only for now
 //!
 //! This library currently expects to be used from within a [tokio](https://tokio.rs) runtime. That
 //! is because it makes use of async timers. Feel free to open an issue if you need support for
 //! other runtimes.
+//!
+//! [`RetryFuture`]: struct.RetryFuture.html
 
 #![warn(missing_docs)]
 
@@ -203,7 +216,7 @@ where
     ///
     /// ```
     /// use std::time::Duration;
-    /// use tryhard::RetryFutureExt;
+    /// use tryhard::{RetryFutureExt, RetryPolicy};
     ///
     /// # async fn read_file(path: &str) -> Result<String, std::io::Error> {
     /// #     todo!()
@@ -214,9 +227,9 @@ where
     ///     .retry(3)
     ///     .custom_backoff(|attempt, error| {
     ///         if error.to_string().contains("foo") {
-    ///             Duration::from_millis(100)
+    ///             RetryPolicy::Delay(Duration::from_millis(100))
     ///         } else {
-    ///             Duration::from_secs(1)
+    ///             RetryPolicy::Delay(Duration::from_secs(1))
     ///         }
     ///     })
     ///     .await?;
@@ -224,7 +237,7 @@ where
     /// # }
     pub fn custom_backoff<Fun>(mut self, f: Fun) -> Self
     where
-        Fun: 'static + FnMut(u32, &E) -> Duration + Send,
+        Fun: 'static + FnMut(u32, &E) -> RetryPolicy + Send,
     {
         self.backoff_strategy = BackoffStrategy::Custom(Box::new(f));
         self
@@ -258,38 +271,39 @@ where
                     RetryState::WaitingForFuture((this.make_future)())
                 }
 
-                RetryStateProj::WaitingForFuture(fut) => {
-                    match ready!(fut.poll(cx)) {
-                        Ok(value) => {
-                            return Poll::Ready(Ok(value));
-                        }
-                        Err(error) => {
-                            if *this.attempts_remaining == 0 {
-                                return Poll::Ready(Err(error));
-                            } else {
-                                *this.attempt += 1;
-                                *this.attempts_remaining -= 1;
+                RetryStateProj::WaitingForFuture(fut) => match ready!(fut.poll(cx)) {
+                    Ok(value) => {
+                        return Poll::Ready(Ok(value));
+                    }
+                    Err(error) => {
+                        if *this.attempts_remaining == 0 {
+                            return Poll::Ready(Err(error));
+                        } else {
+                            *this.attempt += 1;
+                            *this.attempts_remaining -= 1;
 
-                                // rust-analyzer gets confused if you don't declare the type here
-                                let mut delay_duration: Duration =
-                                    this.backoff_strategy.delay(*this.attempt, &error);
-                                if let Some(max_delay) = this.max_delay {
-                                    delay_duration = delay_duration.min(*max_delay);
-                                }
+                            let delay = this.backoff_strategy.delay(*this.attempt, &error);
+                            let mut delay_duration = match delay {
+                                RetryPolicy::Delay(duration) => duration,
+                                RetryPolicy::Break => return Poll::Ready(Err(error)),
+                            };
 
-                                log::error!(
-                                    "Future failed. Retrying again in {:?}. Error: {}. Attempts remaining = {}",
-                                    delay_duration,
-                                    error,
-                                    self.attempts_remaining,
-                                );
-
-                                let delay = time::delay_for(delay_duration);
-                                RetryState::TimerActive(delay)
+                            if let Some(max_delay) = this.max_delay {
+                                delay_duration = delay_duration.min(*max_delay);
                             }
+
+                            log::error!(
+                                "Future failed. Retrying again in {:?}. Error: {}. Attempts remaining = {}",
+                                delay_duration,
+                                error,
+                                self.attempts_remaining,
+                            );
+
+                            let delay = time::delay_for(delay_duration);
+                            RetryState::TimerActive(delay)
                         }
                     }
-                }
+                },
             };
 
             self.as_mut().project().state.set(new_state);
@@ -302,23 +316,34 @@ enum BackoffStrategy<E> {
     Exponential { delay: Duration },
     Fixed { delay: Duration },
     Linear { delay: Duration },
-    Custom(Box<dyn FnMut(u32, &E) -> Duration + Send>),
+    Custom(Box<dyn FnMut(u32, &E) -> RetryPolicy + Send>),
 }
 
 impl<E> BackoffStrategy<E> {
-    fn delay(&mut self, attempt: u32, error: &E) -> Duration {
+    fn delay(&mut self, attempt: u32, error: &E) -> RetryPolicy {
         match self {
-            BackoffStrategy::None => Duration::new(0, 0),
+            BackoffStrategy::None => RetryPolicy::Delay(Duration::new(0, 0)),
             BackoffStrategy::Exponential { delay } => {
                 let prev_delay = *delay;
                 *delay *= 2;
-                prev_delay
+                RetryPolicy::Delay(prev_delay)
             }
-            BackoffStrategy::Fixed { delay } => *delay,
-            BackoffStrategy::Linear { delay } => *delay * attempt,
+            BackoffStrategy::Fixed { delay } => RetryPolicy::Delay(*delay),
+            BackoffStrategy::Linear { delay } => RetryPolicy::Delay(*delay * attempt),
             BackoffStrategy::Custom(f) => f(attempt, error),
         }
     }
+}
+
+/// What to do when a future returns an error. Used with [`RetryFuture::custom`].
+///
+/// [`RetryFuture::custom`]: struct.RetryFuture.html#method.custom_backoff
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum RetryPolicy {
+    /// Try again in the specified `Duration`.
+    Delay(Duration),
+    /// Don't retry.
+    Break,
 }
 
 /// Extension trait that adds a `retry` method to all `FnMut() -> impl Future<Output = Result<T, E>>`.
@@ -413,5 +438,31 @@ mod tests {
             Ok(())
         }
         assert_send(some_future.retry(10));
+    }
+
+    #[tokio::test]
+    async fn stop_retrying() {
+        let mut n = 0;
+        let make_future = || {
+            n += 1;
+            if n == 8 {
+                panic!("retried too many times");
+            }
+            async { Err::<Infallible, _>("foo") }
+        };
+
+        let error = make_future
+            .retry(10)
+            .custom_backoff(|n, _| {
+                if n >= 3 {
+                    RetryPolicy::Break
+                } else {
+                    RetryPolicy::Delay(Duration::from_nanos(10))
+                }
+            })
+            .await
+            .unwrap_err();
+
+        assert_eq!(error, "foo");
     }
 }
