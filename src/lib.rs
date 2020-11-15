@@ -107,13 +107,13 @@ use backoff_strategies::{
 };
 use futures::ready;
 use pin_project::pin_project;
+use std::time::Duration;
 use std::{
     fmt::Display,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
-use std::{marker::PhantomData, time::Duration};
 use tokio::time;
 
 pub mod backoff_strategies;
@@ -131,7 +131,7 @@ pub struct RetryFn<F> {
 
 impl<F> RetryFn<F> {
     /// Specify the number of times to retry the future.
-    pub fn retries<Fut, T, E>(self, max_retries: u32) -> RetryFuture<F, Fut, NoBackoff, T, E>
+    pub fn retries<Fut, T, E>(self, max_retries: u32) -> RetryFuture<F, Fut, NoBackoff>
     where
         F: FnMut() -> Fut,
         Fut: Future<Output = Result<T, E>>,
@@ -143,7 +143,6 @@ impl<F> RetryFn<F> {
             max_delay: None,
             state: RetryState::NotStarted,
             attempt: 0,
-            _marker: PhantomData,
         }
     }
 }
@@ -152,7 +151,7 @@ impl<F> RetryFn<F> {
 ///
 /// Can be created by calling [`retry_fn`](fn.retry_fn.html).
 #[pin_project]
-pub struct RetryFuture<F, Fut, B, T, E> {
+pub struct RetryFuture<F, Fut, B> {
     make_future: F,
     attempts_remaining: u32,
     backoff_strategy: B,
@@ -160,10 +159,9 @@ pub struct RetryFuture<F, Fut, B, T, E> {
     #[pin]
     state: RetryState<Fut>,
     attempt: u32,
-    _marker: PhantomData<(Fut, T, E)>,
 }
 
-impl<F, Fut, B, T, E> RetryFuture<F, Fut, B, T, E>
+impl<F, Fut, B, T, E> RetryFuture<F, Fut, B>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
@@ -179,7 +177,7 @@ where
     ///
     /// This will make the future be retried immediately without any delay in between attempts.
     #[inline]
-    pub fn no_backoff(self) -> RetryFuture<F, Fut, NoBackoff, T, E> {
+    pub fn no_backoff(self) -> RetryFuture<F, Fut, NoBackoff> {
         self.with_backoff(NoBackoff)
     }
 
@@ -190,7 +188,7 @@ where
     pub fn exponential_backoff(
         self,
         initial_delay: Duration,
-    ) -> RetryFuture<F, Fut, ExponentialBackoff, T, E> {
+    ) -> RetryFuture<F, Fut, ExponentialBackoff> {
         self.with_backoff(ExponentialBackoff {
             delay: initial_delay,
         })
@@ -200,7 +198,7 @@ where
     ///
     /// The delay between attempts will always be `delay`.
     #[inline]
-    pub fn fixed_backoff(self, delay: Duration) -> RetryFuture<F, Fut, FixedBackoff, T, E> {
+    pub fn fixed_backoff(self, delay: Duration) -> RetryFuture<F, Fut, FixedBackoff> {
         self.with_backoff(FixedBackoff { delay })
     }
 
@@ -208,7 +206,7 @@ where
     ///
     /// The delay will be `delay * attempt` so it'll scale linear with the attempt.
     #[inline]
-    pub fn linear_backoff(self, delay: Duration) -> RetryFuture<F, Fut, LinearBackoff, T, E> {
+    pub fn linear_backoff(self, delay: Duration) -> RetryFuture<F, Fut, LinearBackoff> {
         self.with_backoff(LinearBackoff { delay })
     }
 
@@ -263,10 +261,7 @@ where
     /// # }
     /// ```
     #[inline]
-    pub fn custom_backoff<Fun, R>(
-        self,
-        f: Fun,
-    ) -> RetryFuture<F, Fut, CustomBackoffStrategy<Fun>, T, E>
+    pub fn custom_backoff<Fun, R>(self, f: Fun) -> RetryFuture<F, Fut, CustomBackoffStrategy<Fun>>
     where
         Fun: FnMut(u32, &E) -> R,
         RetryPolicy: From<R>,
@@ -275,7 +270,7 @@ where
     }
 
     #[inline]
-    fn with_backoff<B2>(self, backoff_strategy: B2) -> RetryFuture<F, Fut, B2, T, E> {
+    fn with_backoff<B2>(self, backoff_strategy: B2) -> RetryFuture<F, Fut, B2> {
         RetryFuture {
             make_future: self.make_future,
             attempts_remaining: self.attempts_remaining,
@@ -283,7 +278,6 @@ where
             max_delay: self.max_delay,
             state: self.state,
             attempt: self.attempt,
-            _marker: self._marker,
         }
     }
 }
@@ -295,7 +289,7 @@ enum RetryState<F> {
     TimerActive(#[pin] time::Delay),
 }
 
-impl<F, Fut, B, T, E> Future for RetryFuture<F, Fut, B, T, E>
+impl<F, Fut, B, T, E> Future for RetryFuture<F, Fut, B>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
