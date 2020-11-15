@@ -7,7 +7,7 @@
 [![dependency status](https://deps.rs/repo/github/EmbarkStudios/tryhard/status.svg)](https://deps.rs/repo/github/EmbarkStudios/tryhard)
 [![Build status](https://github.com/EmbarkStudios/tryhard/workflows/CI/badge.svg)](https://github.com/EmbarkStudios/tryhard/actions)
 
-`tryhard` makes it easy to retry futures that might fail. You can control the number of retries, that backoff strategy, and the max duration.
+`tryhard` makes it easy to retry futures that might fail. You can control the number of retries, the backoff strategy, and the max duration.
 
 ## Examples
 
