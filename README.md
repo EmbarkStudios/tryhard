@@ -11,28 +11,29 @@
 
 ## Examples
 
-First the setup:
+First imagine you have some async function that can fail:
 
 ```rust
-use std::time::Duration;
-use tryhard::RetryFutureExt;
-
-// some async function that can fail
 async fn read_file(path: &str) -> Result<String, std::io::Error> {
     // ...
 }
 ```
 
-The most basic use case. Retry 10 times, with no delay between attempts
+Calling that function and retrying at most 10 times with no delay between attempts can be done like so:
 
 ```rust
-tryhard::retry_fn(|| read_file("Cargo.toml")).retries(10).await?;
+tryhard::retry_fn(|| read_file("Cargo.toml"))
+    .retries(10)
+    .await?;
 ```
 
 You can also retry with a fixed delay between attempts:
 
 ```rust
-tryhard::retry_fn(|| read_file("Cargo.toml")).retries(10).fixed(Duration::from_millis(100)).await?;
+tryhard::retry_fn(|| read_file("Cargo.toml"))
+    .retries(10)
+    .fixed_backoff(Duration::from_millis(100))
+    .await?;
 ```
 
 Or exponential backoff, where the delay doubles each time, with a max delay of 1 second:
