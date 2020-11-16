@@ -335,7 +335,7 @@ where
                             }
 
                             log::error!(
-                                "Future failed. Retrying again in {:?}. Error: {}. Attempts remaining = {}",
+                                "Future failed. Retrying again in {:?}. Error = {}. Attempts remaining = {}",
                                 delay_duration,
                                 error,
                                 self.attempts_remaining,
