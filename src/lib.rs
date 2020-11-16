@@ -97,6 +97,12 @@
 //! other runtimes.
 //!
 //! [`RetryFuture`]: struct.RetryFuture.html
+//!
+//! ## Supported features
+//!
+//! - `logging`: Adds logging through the [log crate](https://crates.io/search?q=log). tryhard will
+//! log with `WARN` when a future has failed and will be retried and `ERROR` when it has exceeded
+//! its retry limit. Disabled by default.
 
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
@@ -317,6 +323,7 @@ where
                     }
                     Err(error) => {
                         if *this.attempts_remaining == 0 {
+                            #[cfg(feature = "logging")]
                             log::error!(
                                 "Future failed. No more attempts remaining. Error = {}",
                                 error
@@ -339,6 +346,7 @@ where
                                 delay_duration = delay_duration.min(*max_delay);
                             }
 
+                            #[cfg(feature = "logging")]
                             log::warn!(
                                 "Future failed. Retrying again in {:?}. Error = {}. Attempts remaining = {}",
                                 delay_duration,
