@@ -317,6 +317,11 @@ where
                     }
                     Err(error) => {
                         if *this.attempts_remaining == 0 {
+                            log::error!(
+                                "Future failed. No more attempts remaining. Error = {}",
+                                error
+                            );
+
                             return Poll::Ready(Err(error));
                         } else {
                             *this.attempt += 1;
@@ -334,7 +339,7 @@ where
                                 delay_duration = delay_duration.min(*max_delay);
                             }
 
-                            log::error!(
+                            log::warn!(
                                 "Future failed. Retrying again in {:?}. Error = {}. Attempts remaining = {}",
                                 delay_duration,
                                 error,
