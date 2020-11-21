@@ -13,7 +13,6 @@ categories = ["rust-patterns"]
 keywords = ["tokio", "futures", "retry"]
 
 [dependencies]
-tokio = { version = "0.2", default-features = false, features = ["time", "macros", "test-util", "rt-core"] }
+tokio = { version = "0.2", default-features = false, features = ["time", "macros", "test-util", "rt-core", "sync"] }
 futures = "0.3"
-log = "0.4"
 pin-project = "1"
