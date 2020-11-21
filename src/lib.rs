@@ -151,20 +151,20 @@ impl<F> RetryFn<F> {
 ///
 /// Can be created by calling [`retry_fn`](fn.retry_fn.html).
 #[pin_project]
-pub struct RetryFuture<F, Fut, B> {
-    make_future: F,
+pub struct RetryFuture<MakeFutureT, FutureT, BackoffT> {
+    make_future: MakeFutureT,
     attempts_remaining: u32,
-    backoff_strategy: B,
+    backoff_strategy: BackoffT,
     max_delay: Option<Duration>,
     #[pin]
-    state: RetryState<Fut>,
+    state: RetryState<FutureT>,
     attempt: u32,
 }
 
-impl<F, Fut, B, T, E> RetryFuture<F, Fut, B>
+impl<MakeFutureT, FutureT, BackoffT, T, E> RetryFuture<MakeFutureT, FutureT, BackoffT>
 where
-    F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, E>>,
+    MakeFutureT: FnMut() -> FutureT,
+    FutureT: Future<Output = Result<T, E>>,
 {
     /// Set the max duration to sleep between each attempt.
     #[inline]
@@ -177,7 +177,7 @@ where
     ///
     /// This will make the future be retried immediately without any delay in between attempts.
     #[inline]
-    pub fn no_backoff(self) -> RetryFuture<F, Fut, NoBackoff> {
+    pub fn no_backoff(self) -> RetryFuture<MakeFutureT, FutureT, NoBackoff> {
         self.with_backoff(NoBackoff)
     }
 
@@ -188,7 +188,7 @@ where
     pub fn exponential_backoff(
         self,
         initial_delay: Duration,
-    ) -> RetryFuture<F, Fut, ExponentialBackoff> {
+    ) -> RetryFuture<MakeFutureT, FutureT, ExponentialBackoff> {
         self.with_backoff(ExponentialBackoff {
             delay: initial_delay,
         })
@@ -198,7 +198,7 @@ where
     ///
     /// The delay between attempts will always be `delay`.
     #[inline]
-    pub fn fixed_backoff(self, delay: Duration) -> RetryFuture<F, Fut, FixedBackoff> {
+    pub fn fixed_backoff(self, delay: Duration) -> RetryFuture<MakeFutureT, FutureT, FixedBackoff> {
         self.with_backoff(FixedBackoff { delay })
     }
 
@@ -206,7 +206,10 @@ where
     ///
     /// The delay will be `delay * attempt` so it'll scale linear with the attempt.
     #[inline]
-    pub fn linear_backoff(self, delay: Duration) -> RetryFuture<F, Fut, LinearBackoff> {
+    pub fn linear_backoff(
+        self,
+        delay: Duration,
+    ) -> RetryFuture<MakeFutureT, FutureT, LinearBackoff> {
         self.with_backoff(LinearBackoff { delay })
     }
 
@@ -261,7 +264,10 @@ where
     /// # }
     /// ```
     #[inline]
-    pub fn custom_backoff<Fun, R>(self, f: Fun) -> RetryFuture<F, Fut, CustomBackoffStrategy<Fun>>
+    pub fn custom_backoff<Fun, R>(
+        self,
+        f: Fun,
+    ) -> RetryFuture<MakeFutureT, FutureT, CustomBackoffStrategy<Fun>>
     where
         Fun: FnMut(u32, &E) -> R,
         RetryPolicy: From<R>,
@@ -270,7 +276,10 @@ where
     }
 
     #[inline]
-    fn with_backoff<B2>(self, backoff_strategy: B2) -> RetryFuture<F, Fut, B2> {
+    fn with_backoff<BackoffT2>(
+        self,
+        backoff_strategy: BackoffT2,
+    ) -> RetryFuture<MakeFutureT, FutureT, BackoffT2> {
         RetryFuture {
             make_future: self.make_future,
             attempts_remaining: self.attempts_remaining,
