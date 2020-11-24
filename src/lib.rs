@@ -96,6 +96,15 @@
 //! is because it makes use of async timers. Feel free to open an issue if you need support for
 //! other runtimes.
 //!
+//! By default it uses Tokio 0.3. You can switch to Tokio 0.2 by disabling default features and
+//! enabling the `tokio-02` feature:
+//!
+//! ```toml
+//! tryhard = { version = "your-version", default-features = false, features = ["tokio-02"] }
+//! ```
+//!
+//! Note that enabling both Tokio 0.3 and 0.2 will cause a compilation error.
+//!
 //! [`RetryFuture`]: struct.RetryFuture.html
 
 #![warn(missing_docs)]
@@ -115,7 +124,15 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::time;
+
+#[cfg(all(feature = "tokio-02", feature = "tokio-03"))]
+compile_error!("Cannot enable both tokio-02 and tokio-03 features");
+
+#[cfg(feature = "tokio-03")]
+use tokio_03 as tokio;
+
+#[cfg(feature = "tokio-02")]
+use tokio_02 as tokio;
 
 pub mod backoff_strategies;
 
@@ -297,9 +314,14 @@ where
     ///
     /// ```
     /// use std::sync::Arc;
+    /// #[cfg(feature = "tokio-03")]
+    /// use tokio_03 as tokio;
+    /// #[cfg(feature = "tokio-02")]
+    /// use tokio_02 as tokio;
     /// use tokio::sync::Mutex;
     ///
-    /// # #[tokio::main]
+    /// # #[cfg_attr(feature = "tokio-03", tokio::main(flavor = "current_thread"))]
+    /// # #[cfg_attr(feature = "tokio-02", tokio::main)]
     /// # async fn main() {
     /// let all_errors = Arc::new(Mutex::new(Vec::new()));
     ///
@@ -362,7 +384,12 @@ where
 enum RetryState<F> {
     NotStarted,
     WaitingForFuture(#[pin] F),
-    TimerActive(#[pin] time::Delay),
+
+    #[cfg(feature = "tokio-03")]
+    TimerActive(#[pin] tokio::time::Sleep),
+
+    #[cfg(feature = "tokio-02")]
+    TimerActive(#[pin] tokio::time::Delay),
 }
 
 impl<F, Fut, B, T, E, OnRetryT> Future for RetryFuture<F, Fut, B, OnRetryT>
@@ -433,7 +460,12 @@ where
                                 ));
                             }
 
-                            let delay = time::delay_for(delay_duration);
+                            #[cfg(feature = "tokio-03")]
+                            let delay = tokio::time::sleep(delay_duration);
+
+                            #[cfg(feature = "tokio-02")]
+                            let delay = tokio::time::delay_for(delay_duration);
+
                             RetryState::TimerActive(delay)
                         }
                     }
