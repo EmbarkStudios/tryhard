@@ -48,16 +48,16 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fetch
-      - name: cargo test build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --tests --release
-      - name: cargo test
+      - name: cargo test (tokio 0.3)
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --release
+      - name: cargo test (tokio 0.2)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release --no-default-features --features tokio-02
 
   publish-check:
     name: Publish Check
