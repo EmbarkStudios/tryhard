@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Changed
-- Changed from using Tokio 0.2 by default to using Tokio 0.3. You can switch back to Tokio 0.2 by declaring your dependency with `tryhard = { version = "your-version", default-features = false, features = ["tokio-02"] }`.
+- N/A
 
 ### Deprecated
 - N/A
@@ -23,10 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - N/A
 
+## [0.2.0] - 2020-11-25
+### Changed
+- Changed from using Tokio 0.2 by default to using Tokio 0.3. You can switch back to Tokio 0.2 by declaring your dependency with `tryhard = { version = "your-version", default-features = false, features = ["tokio-02"] }`.
+
 ## [0.1.0] - 2020-11-21
 ### Added
 - First release!
 
-[Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.1.0...HEAD
-<!--[0.1.1]: https://github.com/EmbarkStudios/tryhard/compare/0.1.0...0.1.1 -->
+[Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/EmbarkStudios/tryhard/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/EmbarkStudios/tryhard/releases/tag/0.1.0
