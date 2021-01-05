@@ -96,14 +96,16 @@
 //! is because it makes use of async timers. Feel free to open an issue if you need support for
 //! other runtimes.
 //!
-//! By default it uses Tokio 0.3. You can switch to Tokio 0.2 by disabling default features and
+//! By default it uses Tokio 1.0. You can switch to Tokio 0.2 by disabling default features and
 //! enabling the `tokio-02` feature:
 //!
 //! ```toml
 //! tryhard = { version = "your-version", default-features = false, features = ["tokio-02"] }
 //! ```
 //!
-//! Note that enabling both Tokio 0.3 and 0.2 will cause a compilation error.
+//! Note that enabling both Tokio 1.0 and 0.2 will cause a compilation error.
+//!
+//! Tokio 0.3 is not supported.
 //!
 //! [`RetryFuture`]: struct.RetryFuture.html
 
@@ -125,11 +127,11 @@ use std::{
     task::{Context, Poll},
 };
 
-#[cfg(all(feature = "tokio-02", feature = "tokio-03"))]
-compile_error!("Cannot enable both tokio-02 and tokio-03 features");
+#[cfg(all(feature = "tokio-02", feature = "tokio-1"))]
+compile_error!("Cannot enable both tokio-02 and tokio-1 features");
 
-#[cfg(feature = "tokio-03")]
-use tokio_03 as tokio;
+#[cfg(feature = "tokio-1")]
+use tokio_1 as tokio;
 
 #[cfg(feature = "tokio-02")]
 use tokio_02 as tokio;
@@ -314,13 +316,13 @@ where
     ///
     /// ```
     /// use std::sync::Arc;
-    /// #[cfg(feature = "tokio-03")]
-    /// use tokio_03 as tokio;
+    /// #[cfg(feature = "tokio-1")]
+    /// use tokio_1 as tokio;
     /// #[cfg(feature = "tokio-02")]
     /// use tokio_02 as tokio;
     /// use tokio::sync::Mutex;
     ///
-    /// # #[cfg_attr(feature = "tokio-03", tokio::main(flavor = "current_thread"))]
+    /// # #[cfg_attr(feature = "tokio-1", tokio::main(flavor = "current_thread"))]
     /// # #[cfg_attr(feature = "tokio-02", tokio::main)]
     /// # async fn main() {
     /// let all_errors = Arc::new(Mutex::new(Vec::new()));
@@ -380,12 +382,13 @@ where
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[pin_project(project = RetryStateProj)]
 enum RetryState<F> {
     NotStarted,
     WaitingForFuture(#[pin] F),
 
-    #[cfg(feature = "tokio-03")]
+    #[cfg(feature = "tokio-1")]
     TimerActive(#[pin] tokio::time::Sleep),
 
     #[cfg(feature = "tokio-02")]
@@ -460,7 +463,7 @@ where
                                 ));
                             }
 
-                            #[cfg(feature = "tokio-03")]
+                            #[cfg(feature = "tokio-1")]
                             let delay = tokio::time::sleep(delay_duration);
 
                             #[cfg(feature = "tokio-02")]

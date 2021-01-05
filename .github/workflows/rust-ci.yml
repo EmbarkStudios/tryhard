@@ -48,7 +48,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fetch
-      - name: cargo test (tokio 0.3)
+      - name: cargo test (tokio 1.0)
         uses: actions-rs/cargo@v1
         with:
           command: test
