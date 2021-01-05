@@ -450,13 +450,13 @@ pub struct RetryFutureConfig<BackoffT, OnRetryT> {
     max_retries: u32,
 }
 
-impl RetryFutureConfig<NoBackoff, Infallible> {
+impl RetryFutureConfig<NoBackoff, NoOnRetry> {
     /// Create a new configuration with a max number of retries and no backoff strategy.
     pub fn retries(max_retries: u32) -> Self {
         Self {
             backoff_strategy: NoBackoff,
             max_delay: None,
-            on_retry: None::<Infallible>,
+            on_retry: None::<NoOnRetry>,
             max_retries,
         }
     }
@@ -692,12 +692,19 @@ pub trait OnRetry<E> {
     ) -> Self::Future;
 }
 
-impl<E> OnRetry<E> for Infallible {
+/// A sentinel value that represents doing nothing in between retries futures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoOnRetry {
+    _cannot_exist: Infallible,
+}
+
+impl<E> OnRetry<E> for NoOnRetry {
     type Future = Ready<Infallible>;
     type Output = Infallible;
 
     #[inline]
     fn on_retry(&mut self, _: u32, _: Option<Duration>, _: &E) -> Self::Future {
+        // this is safe because `NoOnRetry` contains an `Infallible` so it cannot be created
         unreachable!()
     }
 }
