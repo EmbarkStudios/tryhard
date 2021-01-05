@@ -202,25 +202,21 @@ pub struct RetryFn<F> {
     f: F,
 }
 
-impl<F> RetryFn<F> {
+impl<F, Fut, T, E> RetryFn<F>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+{
     /// Specify the number of times to retry the future.
-    pub fn retries<Fut, T, E>(self, max_retries: u32) -> RetryFuture<F, Fut, NoBackoff, NoOnRetry>
-    where
-        F: FnMut() -> Fut,
-        Fut: Future<Output = Result<T, E>>,
-    {
+    pub fn retries(self, max_retries: u32) -> RetryFuture<F, Fut, NoBackoff, NoOnRetry> {
         self.with_config(RetryFutureConfig::retries(max_retries))
     }
 
     /// Create a retryable future from the given configuration.
-    pub fn with_config<Fut, T, E, BackoffT, OnRetryT>(
+    pub fn with_config<BackoffT, OnRetryT>(
         self,
         config: RetryFutureConfig<BackoffT, OnRetryT>,
-    ) -> RetryFuture<F, Fut, BackoffT, OnRetryT>
-    where
-        F: FnMut() -> Fut,
-        Fut: Future<Output = Result<T, E>>,
-    {
+    ) -> RetryFuture<F, Fut, BackoffT, OnRetryT> {
         RetryFuture {
             make_future: self.f,
             attempts_remaining: config.max_retries,
