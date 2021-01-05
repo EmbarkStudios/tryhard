@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- N/A
+- Support for Tokio 1.0 added. Tokio 1.0 support is on by default or by enabling the `tokio-1` feature.
 
 ### Changed
 - N/A
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Removed
-- N/A
+- Support for Tokio 0.3 has been removed. 0.2 is still supported.
 
 ### Fixed
 - N/A
