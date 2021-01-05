@@ -100,7 +100,7 @@ where
 impl<F> fmt::Debug for CustomBackoffStrategy<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CustomBackoffStrategy")
-            .field("f", &format_args!("{:?}", std::any::type_name::<F>()))
+            .field("f", &format_args!("<{}>", std::any::type_name::<F>()))
             .finish()
     }
 }
@@ -117,7 +117,7 @@ mod tests {
 
         assert_eq!(
             format!("{:?}", backoff),
-            "CustomBackoffStrategy { f: \"tryhard::backoff_strategies::tests::custom_has_useful_debug_impl::{{closure}}\" }",
+            "CustomBackoffStrategy { f: <tryhard::backoff_strategies::tests::custom_has_useful_debug_impl::{{closure}}> }",
         );
     }
 }

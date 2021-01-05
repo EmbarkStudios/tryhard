@@ -558,7 +558,7 @@ where
             .field("max_retries", &self.max_retries)
             .field(
                 "on_retry",
-                &format_args!("{:?}", std::any::type_name::<OnRetryT>()),
+                &format_args!("<{}>", std::any::type_name::<OnRetryT>()),
             )
             .finish()
     }
