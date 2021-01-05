@@ -174,7 +174,7 @@ use futures::ready;
 use pin_project::pin_project;
 use std::{convert::Infallible, time::Duration};
 use std::{
-    fmt::Display,
+    fmt,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
@@ -442,7 +442,7 @@ where
 /// Configuration describing how to retry a future.
 ///
 /// This is useful if you have many futures you want to retry in the same way.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct RetryFutureConfig<BackoffT, OnRetryT> {
     backoff_strategy: BackoffT,
     max_delay: Option<Duration>,
@@ -554,6 +554,23 @@ impl<BackoffT, OnRetryT> RetryFutureConfig<BackoffT, OnRetryT> {
     }
 }
 
+impl<BackoffT, OnRetryT> fmt::Debug for RetryFutureConfig<BackoffT, OnRetryT>
+where
+    BackoffT: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RetryFutureConfig")
+            .field("backoff_strategy", &self.backoff_strategy)
+            .field("max_delay", &self.max_delay)
+            .field("max_retries", &self.max_retries)
+            .field(
+                "on_retry",
+                &format_args!("{:?}", std::any::type_name::<OnRetryT>()),
+            )
+            .finish()
+    }
+}
+
 #[allow(clippy::large_enum_variant)]
 #[pin_project(project = RetryStateProj)]
 enum RetryState<F> {
@@ -571,7 +588,7 @@ impl<F, Fut, B, T, E, OnRetryT> Future for RetryFuture<F, Fut, B, OnRetryT>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
-    E: Display,
+    E: fmt::Display,
     B: BackoffStrategy<E>,
     B::Output: Into<RetryPolicy>,
     OnRetryT: OnRetry<E>,
