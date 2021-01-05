@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for Tokio 0.3 has been removed. 0.2 is still supported.
 
 ### Fixed
-- N/A
+- `CustomBackoffStrategy` now implements `Debug` regardless of its type parameter.
 
 ### Security
 - N/A

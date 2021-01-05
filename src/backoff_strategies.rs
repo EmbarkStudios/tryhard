@@ -1,6 +1,7 @@
 //! The types of backoff strategies that are supported
 
 use crate::RetryPolicy;
+use std::fmt;
 use std::time::Duration;
 
 /// Trait for computing the amount of delay between attempts.
@@ -78,7 +79,6 @@ impl<E> BackoffStrategy<E> for LinearBackoff {
 }
 
 /// A custom backoff strategy defined by a function.
-#[derive(Debug)]
 pub struct CustomBackoffStrategy<F> {
     pub(crate) f: F,
 }
@@ -93,5 +93,30 @@ where
     #[inline]
     fn delay(&mut self, attempt: u32, error: &E) -> RetryPolicy {
         (self.f)(attempt, error).into()
+    }
+}
+
+impl<F> fmt::Debug for CustomBackoffStrategy<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CustomBackoffStrategy")
+            .field("f", &format_args!("{:?}", std::any::type_name::<F>()))
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::convert::Infallible;
+
+    #[test]
+    fn custom_has_useful_debug_impl() {
+        let f = |_: u32, _: Infallible| Duration::from_secs(1);
+        let backoff = CustomBackoffStrategy { f };
+
+        assert_eq!(
+            format!("{:?}", backoff),
+            "CustomBackoffStrategy { f: \"tryhard::backoff_strategies::tests::custom_has_useful_debug_impl::{{closure}}\" }",
+        );
     }
 }
