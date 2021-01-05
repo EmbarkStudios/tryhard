@@ -204,10 +204,7 @@ pub struct RetryFn<F> {
 
 impl<F> RetryFn<F> {
     /// Specify the number of times to retry the future.
-    pub fn retries<Fut, T, E>(
-        self,
-        max_retries: u32,
-    ) -> RetryFuture<F, Fut, NoBackoff, impl OnRetry<E>>
+    pub fn retries<Fut, T, E>(self, max_retries: u32) -> RetryFuture<F, Fut, NoBackoff, NoOnRetry>
     where
         F: FnMut() -> Fut,
         Fut: Future<Output = Result<T, E>>,
