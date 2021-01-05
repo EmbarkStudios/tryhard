@@ -605,8 +605,11 @@ where
                             *this.attempt += 1;
                             *this.attempts_remaining -= 1;
 
-                            let delay: RetryPolicy =
-                                this.config.backoff_strategy.delay(*this.attempt, &error).into();
+                            let delay: RetryPolicy = this
+                                .config
+                                .backoff_strategy
+                                .delay(*this.attempt, &error)
+                                .into();
                             let mut delay_duration = match delay {
                                 RetryPolicy::Delay(duration) => duration,
                                 RetryPolicy::Break => {
@@ -733,8 +736,8 @@ where
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::{convert::Infallible, time::Instant};
     use std::sync::Arc;
+    use std::{convert::Infallible, time::Instant};
 
     #[tokio::test]
     async fn succeed() {
