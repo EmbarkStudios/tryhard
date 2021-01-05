@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Support for Tokio 1.0 added. Tokio 1.0 support is on by default or by enabling the `tokio-1` feature.
+- Add `RetryFutureConfig` which let you retry several futures in the same way.
 
 ### Changed
 - N/A
