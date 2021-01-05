@@ -695,7 +695,7 @@ pub trait OnRetry<E> {
     ) -> Self::Future;
 }
 
-/// A sentinel value that represents doing nothing in between retries futures.
+/// A sentinel value that represents doing nothing in between retries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoOnRetry {
     _cannot_exist: Infallible,
