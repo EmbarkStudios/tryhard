@@ -86,12 +86,12 @@ pub struct CustomBackoffStrategy<F> {
 impl<F, E, T> BackoffStrategy<E> for CustomBackoffStrategy<F>
 where
     F: FnMut(u32, &E) -> T,
-    RetryPolicy: From<T>,
+    T: Into<RetryPolicy>,
 {
     type Output = RetryPolicy;
 
     #[inline]
     fn delay(&mut self, attempt: u32, error: &E) -> RetryPolicy {
-        RetryPolicy::from((self.f)(attempt, error))
+        (self.f)(attempt, error).into()
     }
 }

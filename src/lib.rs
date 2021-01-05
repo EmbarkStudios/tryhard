@@ -299,7 +299,7 @@ where
     ) -> RetryFuture<MakeFutureT, FutureT, CustomBackoffStrategy<F>, OnRetryT>
     where
         F: FnMut(u32, &E) -> R,
-        RetryPolicy: From<R>,
+        R: Into<RetryPolicy>,
     {
         self.with_backoff(CustomBackoffStrategy { f })
     }
@@ -401,7 +401,7 @@ where
     Fut: Future<Output = Result<T, E>>,
     E: Display,
     B: BackoffStrategy<E>,
-    RetryPolicy: From<B::Output>,
+    B::Output: Into<RetryPolicy>,
     OnRetryT: OnRetry<E>,
 {
     type Output = Result<T, E>;
@@ -433,9 +433,8 @@ where
                             *this.attempt += 1;
                             *this.attempts_remaining -= 1;
 
-                            let delay = RetryPolicy::from(
-                                this.backoff_strategy.delay(*this.attempt, &error),
-                            );
+                            let delay: RetryPolicy =
+                                this.backoff_strategy.delay(*this.attempt, &error).into();
                             let mut delay_duration = match delay {
                                 RetryPolicy::Delay(duration) => duration,
                                 RetryPolicy::Break => {
