@@ -81,7 +81,7 @@
 //! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
 //! use tryhard::RetryFutureConfig;
 //!
-//! let config = RetryFutureConfig::retries(10)
+//! let config = RetryFutureConfig::new(10)
 //!     .exponential_backoff(Duration::from_millis(10))
 //!     .max_delay(Duration::from_secs(3));
 //!
@@ -209,7 +209,7 @@ where
 {
     /// Specify the number of times to retry the future.
     pub fn retries(self, max_retries: u32) -> RetryFuture<F, Fut, NoBackoff, NoOnRetry> {
-        self.with_config(RetryFutureConfig::retries(max_retries))
+        self.with_config(RetryFutureConfig::new(max_retries))
     }
 
     /// Create a retryable future from the given configuration.
@@ -445,7 +445,7 @@ pub struct RetryFutureConfig<BackoffT, OnRetryT> {
 
 impl RetryFutureConfig<NoBackoff, NoOnRetry> {
     /// Create a new configuration with a max number of retries and no backoff strategy.
-    pub fn retries(max_retries: u32) -> Self {
+    pub fn new(max_retries: u32) -> Self {
         Self {
             backoff_strategy: NoBackoff,
             max_delay: None,
@@ -894,7 +894,7 @@ mod tests {
     async fn reusing_the_config() {
         let counter = Arc::new(AtomicUsize::new(0));
 
-        let config = RetryFutureConfig::retries(10)
+        let config = RetryFutureConfig::new(10)
             .max_delay(Duration::from_secs(1))
             .linear_backoff(Duration::from_millis(10))
             .on_retry(|_, _, _| {
