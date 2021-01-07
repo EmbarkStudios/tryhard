@@ -6,9 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Support for Tokio 1.0 added. Tokio 1.0 support is on by default or by enabling the `tokio-1` feature.
-- Add `RetryFutureConfig` which let you retry several futures in the same way.
-- All backoff strategy types now implement `Copy` and `Clone`.
+- N/A
 
 ### Changed
 - N/A
@@ -17,13 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Removed
+- N/A
+
+### Fixed
+- N/A
+
+### Security
+- N/A
+
+## [0.3.0] - 2021-01-07
+### Added
+- Support for Tokio 1.0 added. Tokio 1.0 support is on by default or by enabling the `tokio-1` feature.
+- Add `RetryFutureConfig` which let you retry several futures in the same way.
+- All backoff strategy types now implement `Copy` and `Clone`.
+
+### Removed
 - Support for Tokio 0.3 has been removed. 0.2 is still supported.
 
 ### Fixed
 - `CustomBackoffStrategy` now implements `Debug` regardless of its type parameter.
-
-### Security
-- N/A
 
 ## [0.2.0] - 2020-11-25
 ### Changed
@@ -34,5 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - First release!
 
 [Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.2.0...HEAD
+[0.3.0]: https://github.com/EmbarkStudios/tryhard/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/EmbarkStudios/tryhard/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/EmbarkStudios/tryhard/releases/tag/0.1.0
