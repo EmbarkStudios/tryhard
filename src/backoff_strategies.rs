@@ -19,7 +19,7 @@ pub trait BackoffStrategy<E> {
 
 /// No backoff. This will make the future be retried immediately without any delay in between
 /// attempts.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct NoBackoff;
 
 impl<E> BackoffStrategy<E> for NoBackoff {
@@ -32,7 +32,7 @@ impl<E> BackoffStrategy<E> for NoBackoff {
 }
 
 /// Exponential backoff. The delay will double each time.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExponentialBackoff {
     pub(crate) delay: Duration,
 }
@@ -49,7 +49,7 @@ impl<E> BackoffStrategy<E> for ExponentialBackoff {
 }
 
 /// Fixed backoff. The delay wont change between attempts.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct FixedBackoff {
     pub(crate) delay: Duration,
 }
@@ -64,7 +64,7 @@ impl<E> BackoffStrategy<E> for FixedBackoff {
 }
 
 /// Linear backoff. The delay will scale linearly with the number of attempts.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct LinearBackoff {
     pub(crate) delay: Duration,
 }
@@ -79,6 +79,7 @@ impl<E> BackoffStrategy<E> for LinearBackoff {
 }
 
 /// A custom backoff strategy defined by a function.
+#[derive(Clone, Copy)]
 pub struct CustomBackoffStrategy<F> {
     pub(crate) f: F,
 }
@@ -99,7 +100,7 @@ where
 impl<F> fmt::Debug for CustomBackoffStrategy<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CustomBackoffStrategy")
-            .field("f", &format_args!("{:?}", std::any::type_name::<F>()))
+            .field("f", &format_args!("<{}>", std::any::type_name::<F>()))
             .finish()
     }
 }
@@ -116,7 +117,7 @@ mod tests {
 
         assert_eq!(
             format!("{:?}", backoff),
-            "CustomBackoffStrategy { f: \"tryhard::backoff_strategies::tests::custom_has_useful_debug_impl::{{closure}}\" }",
+            "CustomBackoffStrategy { f: <tryhard::backoff_strategies::tests::custom_has_useful_debug_impl::{{closure}}> }",
         );
     }
 }

@@ -44,6 +44,59 @@
 //! # }
 //! ```
 //!
+//! You can also customize which backoff strategy to use and what the max retry delay should be:
+//!
+//! ```
+//! use std::time::Duration;
+//!
+//! # async fn read_file(path: &str) -> Result<String, std::io::Error> {
+//! #     Ok("tryhard".to_string())
+//! # }
+//! # futures::executor::block_on(async_try_main()).unwrap();
+//! #
+//! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
+//! let contents = tryhard::retry_fn(|| read_file("Cargo.toml"))
+//!     .retries(10)
+//!     .exponential_backoff(Duration::from_millis(10))
+//!     .max_delay(Duration::from_secs(1))
+//!     .await?;
+//!
+//! assert!(contents.contains("tryhard"));
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Retrying several futures in the same way
+//!
+//! Using [`RetryFutureConfig`] you're able to retry several futures in the same way:
+//!
+//! ```
+//! # use std::time::Duration;
+//! # async fn read_file(path: &str) -> Result<String, std::io::Error> {
+//! #     Ok("tryhard".to_string())
+//! # }
+//! #
+//! # futures::executor::block_on(async_try_main()).unwrap();
+//! #
+//! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
+//! use tryhard::RetryFutureConfig;
+//!
+//! let config = RetryFutureConfig::new(10)
+//!     .exponential_backoff(Duration::from_millis(10))
+//!     .max_delay(Duration::from_secs(3));
+//!
+//! tryhard::retry_fn(|| read_file("Cargo.toml"))
+//!     .with_config(config)
+//!     .await?;
+//!
+//! // retry another future in the same way
+//! tryhard::retry_fn(|| read_file("src/lib.rs"))
+//!     .with_config(config)
+//!     .await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! ## How many times will my future run?
 //!
 //! The future is always run at least once, so if you do `.retries(0)` your future will run once.
@@ -121,7 +174,7 @@ use futures::ready;
 use pin_project::pin_project;
 use std::{convert::Infallible, time::Duration};
 use std::{
-    fmt::Display,
+    fmt,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
@@ -149,24 +202,27 @@ pub struct RetryFn<F> {
     f: F,
 }
 
-impl<F> RetryFn<F> {
+impl<F, Fut, T, E> RetryFn<F>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+{
     /// Specify the number of times to retry the future.
-    pub fn retries<Fut, T, E>(
+    pub fn retries(self, max_retries: u32) -> RetryFuture<F, Fut, NoBackoff, NoOnRetry> {
+        self.with_config(RetryFutureConfig::new(max_retries))
+    }
+
+    /// Create a retryable future from the given configuration.
+    pub fn with_config<BackoffT, OnRetryT>(
         self,
-        max_retries: u32,
-    ) -> RetryFuture<F, Fut, NoBackoff, impl OnRetry<E>>
-    where
-        F: FnMut() -> Fut,
-        Fut: Future<Output = Result<T, E>>,
-    {
+        config: RetryFutureConfig<BackoffT, OnRetryT>,
+    ) -> RetryFuture<F, Fut, BackoffT, OnRetryT> {
         RetryFuture {
             make_future: self.f,
-            attempts_remaining: max_retries,
-            backoff_strategy: NoBackoff,
-            max_delay: None,
+            attempts_remaining: config.max_retries,
             state: RetryState::NotStarted,
             attempt: 0,
-            on_retry: None::<Infallible>,
+            config,
         }
     }
 }
@@ -178,12 +234,10 @@ impl<F> RetryFn<F> {
 pub struct RetryFuture<MakeFutureT, FutureT, BackoffT, OnRetryT> {
     make_future: MakeFutureT,
     attempts_remaining: u32,
-    backoff_strategy: BackoffT,
-    max_delay: Option<Duration>,
     #[pin]
     state: RetryState<FutureT>,
     attempt: u32,
-    on_retry: Option<OnRetryT>,
+    config: RetryFutureConfig<BackoffT, OnRetryT>,
 }
 
 impl<MakeFutureT, FutureT, BackoffT, T, E, OnRetryT>
@@ -195,7 +249,7 @@ where
     /// Set the max duration to sleep between each attempt.
     #[inline]
     pub fn max_delay(mut self, delay: Duration) -> Self {
-        self.max_delay = Some(delay);
+        self.config = self.config.max_delay(delay);
         self
     }
 
@@ -357,11 +411,9 @@ where
         RetryFuture {
             make_future: self.make_future,
             attempts_remaining: self.attempts_remaining,
-            backoff_strategy: self.backoff_strategy,
-            max_delay: self.max_delay,
             state: self.state,
             attempt: self.attempt,
-            on_retry: Some(f),
+            config: self.config.on_retry(f),
         }
     }
 
@@ -373,12 +425,142 @@ where
         RetryFuture {
             make_future: self.make_future,
             attempts_remaining: self.attempts_remaining,
-            backoff_strategy,
-            max_delay: self.max_delay,
             state: self.state,
             attempt: self.attempt,
+            config: self.config.with_backoff(backoff_strategy),
+        }
+    }
+}
+
+/// Configuration describing how to retry a future.
+///
+/// This is useful if you have many futures you want to retry in the same way.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RetryFutureConfig<BackoffT, OnRetryT> {
+    backoff_strategy: BackoffT,
+    max_delay: Option<Duration>,
+    on_retry: Option<OnRetryT>,
+    max_retries: u32,
+}
+
+impl RetryFutureConfig<NoBackoff, NoOnRetry> {
+    /// Create a new configuration with a max number of retries and no backoff strategy.
+    pub fn new(max_retries: u32) -> Self {
+        Self {
+            backoff_strategy: NoBackoff,
+            max_delay: None,
+            on_retry: None::<NoOnRetry>,
+            max_retries,
+        }
+    }
+}
+
+impl<BackoffT, OnRetryT> RetryFutureConfig<BackoffT, OnRetryT> {
+    /// Set the max duration to sleep between each attempt.
+    #[inline]
+    pub fn max_delay(mut self, delay: Duration) -> Self {
+        self.max_delay = Some(delay);
+        self
+    }
+
+    /// Remove the backoff strategy.
+    ///
+    /// This will make the future be retried immediately without any delay in between attempts.
+    #[inline]
+    pub fn no_backoff(self) -> RetryFutureConfig<NoBackoff, OnRetryT> {
+        self.with_backoff(NoBackoff)
+    }
+
+    /// Use exponential backoff for retrying the future.
+    ///
+    /// The first delay will be `initial_delay` and afterwards the delay will double every time.
+    #[inline]
+    pub fn exponential_backoff(
+        self,
+        initial_delay: Duration,
+    ) -> RetryFutureConfig<ExponentialBackoff, OnRetryT> {
+        self.with_backoff(ExponentialBackoff {
+            delay: initial_delay,
+        })
+    }
+
+    /// Use a fixed backoff for retrying the future.
+    ///
+    /// The delay between attempts will always be `delay`.
+    #[inline]
+    pub fn fixed_backoff(self, delay: Duration) -> RetryFutureConfig<FixedBackoff, OnRetryT> {
+        self.with_backoff(FixedBackoff { delay })
+    }
+
+    /// Use a linear backoff for retrying the future.
+    ///
+    /// The delay will be `delay * attempt` so it'll scale linear with the attempt.
+    #[inline]
+    pub fn linear_backoff(self, delay: Duration) -> RetryFutureConfig<LinearBackoff, OnRetryT> {
+        self.with_backoff(LinearBackoff { delay })
+    }
+
+    /// Use a custom backoff specified by some function.
+    ///
+    /// See [`RetryFuture::custom_backoff`] for more details.
+    #[inline]
+    pub fn custom_backoff<F, R, E>(
+        self,
+        f: F,
+    ) -> RetryFutureConfig<CustomBackoffStrategy<F>, OnRetryT>
+    where
+        F: FnMut(u32, &E) -> R,
+        R: Into<RetryPolicy>,
+    {
+        self.with_backoff(CustomBackoffStrategy { f })
+    }
+
+    /// Some async computation that will be spawned before each retry.
+    ///
+    /// See [`RetryFuture::on_retry`] for more details.
+    #[inline]
+    pub fn on_retry<F, OnRetryFuture, E>(self, f: F) -> RetryFutureConfig<BackoffT, F>
+    where
+        F: FnMut(u32, Option<Duration>, &E) -> OnRetryFuture,
+        OnRetryFuture: Future + Send + 'static,
+        OnRetryFuture::Output: Send + 'static,
+    {
+        RetryFutureConfig {
+            backoff_strategy: self.backoff_strategy,
+            max_delay: self.max_delay,
+            max_retries: self.max_retries,
+            on_retry: Some(f),
+        }
+    }
+
+    #[inline]
+    fn with_backoff<BackoffT2>(
+        self,
+        backoff_strategy: BackoffT2,
+    ) -> RetryFutureConfig<BackoffT2, OnRetryT> {
+        RetryFutureConfig {
+            backoff_strategy,
+            max_delay: self.max_delay,
+            max_retries: self.max_retries,
             on_retry: self.on_retry,
         }
+    }
+}
+
+impl<BackoffT, OnRetryT> fmt::Debug for RetryFutureConfig<BackoffT, OnRetryT>
+where
+    BackoffT: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RetryFutureConfig")
+            .field("backoff_strategy", &self.backoff_strategy)
+            .field("max_delay", &self.max_delay)
+            .field("max_retries", &self.max_retries)
+            .field(
+                "on_retry",
+                &format_args!("<{}>", std::any::type_name::<OnRetryT>()),
+            )
+            .finish()
     }
 }
 
@@ -399,7 +581,7 @@ impl<F, Fut, B, T, E, OnRetryT> Future for RetryFuture<F, Fut, B, OnRetryT>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
-    E: Display,
+    E: fmt::Display,
     B: BackoffStrategy<E>,
     B::Output: Into<RetryPolicy>,
     OnRetryT: OnRetry<E>,
@@ -424,7 +606,7 @@ where
                     }
                     Err(error) => {
                         if *this.attempts_remaining == 0 {
-                            if let Some(on_retry) = this.on_retry {
+                            if let Some(on_retry) = &mut this.config.on_retry {
                                 tokio::spawn(on_retry.on_retry(*this.attempt, None, &error));
                             }
 
@@ -433,12 +615,15 @@ where
                             *this.attempt += 1;
                             *this.attempts_remaining -= 1;
 
-                            let delay: RetryPolicy =
-                                this.backoff_strategy.delay(*this.attempt, &error).into();
+                            let delay: RetryPolicy = this
+                                .config
+                                .backoff_strategy
+                                .delay(*this.attempt, &error)
+                                .into();
                             let mut delay_duration = match delay {
                                 RetryPolicy::Delay(duration) => duration,
                                 RetryPolicy::Break => {
-                                    if let Some(on_retry) = this.on_retry {
+                                    if let Some(on_retry) = &mut this.config.on_retry {
                                         tokio::spawn(on_retry.on_retry(
                                             *this.attempt,
                                             None,
@@ -450,11 +635,11 @@ where
                                 }
                             };
 
-                            if let Some(max_delay) = this.max_delay {
-                                delay_duration = delay_duration.min(*max_delay);
+                            if let Some(max_delay) = this.config.max_delay {
+                                delay_duration = delay_duration.min(max_delay);
                             }
 
-                            if let Some(on_retry) = this.on_retry {
+                            if let Some(on_retry) = &mut this.config.on_retry {
                                 tokio::spawn(on_retry.on_retry(
                                     *this.attempt,
                                     Some(delay_duration),
@@ -520,12 +705,19 @@ pub trait OnRetry<E> {
     ) -> Self::Future;
 }
 
-impl<E> OnRetry<E> for Infallible {
+/// A sentinel value that represents doing nothing in between retries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoOnRetry {
+    _cannot_exist: Infallible,
+}
+
+impl<E> OnRetry<E> for NoOnRetry {
     type Future = Ready<Infallible>;
     type Output = Infallible;
 
     #[inline]
     fn on_retry(&mut self, _: u32, _: Option<Duration>, _: &E) -> Self::Future {
+        // this is safe because `NoOnRetry` contains an `Infallible` so it cannot be created
         unreachable!()
     }
 }
@@ -554,6 +746,7 @@ where
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
     use std::{convert::Infallible, time::Instant};
 
     #[tokio::test]
@@ -695,5 +888,34 @@ mod tests {
                 &(n, Some(Duration::new(0, 0)), "error".to_string())
             );
         }
+    }
+
+    #[tokio::test]
+    async fn reusing_the_config() {
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let config = RetryFutureConfig::new(10)
+            .max_delay(Duration::from_secs(1))
+            .linear_backoff(Duration::from_millis(10))
+            .on_retry(|_, _, _| {
+                let counter = Arc::clone(&counter);
+                async move {
+                    counter.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+
+        let ok_value = retry_fn(|| async { Ok::<_, &str>(true) })
+            .with_config(config)
+            .await
+            .unwrap();
+        assert!(ok_value);
+        assert_eq!(counter.load(Ordering::SeqCst), 0);
+
+        let err_value = retry_fn(|| async { Err::<(), _>("foo") })
+            .with_config(config)
+            .await
+            .unwrap_err();
+        assert_eq!(err_value, "foo");
+        assert_eq!(counter.load(Ordering::SeqCst), 10);
     }
 }
