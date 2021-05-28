@@ -4,18 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [Unreleased]
 ### Added
-- N/A
+- Added `RetryFutureConfig::boxed_on_retry` which converts the `on_retry`
+  callback into a boxed trait object which makes the type easier to name.
 
 ### Changed
-- N/A
+- `OnRetry::on_retry` no longer receives `&mut self` but instead
+  `&self`. That was necessary to implement `BoxOnRetry`. Users who need mutation
+  in their callbacks should use a mutex.
+- The output of the future returned by `OnRetry::on_retry` has been
+  fixed to `()`. As the future is given to `tokio::spawn` I think requiring `()`
+  is nicer. It also simplified some trait bounds on `BoxOnRetry`.
 
 ### Deprecated
 - N/A
 
 ### Removed
-- N/A
+- Tokio 0.2 support has been removed. Tokio 1 is now the only version
+  supported.
 
 ### Fixed
 - N/A

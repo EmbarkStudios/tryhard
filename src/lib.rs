@@ -44,28 +44,6 @@
 //! # }
 //! ```
 //!
-//! You can also customize which backoff strategy to use and what the max retry delay should be:
-//!
-//! ```
-//! use std::time::Duration;
-//!
-//! # async fn read_file(path: &str) -> Result<String, std::io::Error> {
-//! #     Ok("tryhard".to_string())
-//! # }
-//! # futures::executor::block_on(async_try_main()).unwrap();
-//! #
-//! # async fn async_try_main() -> Result<(), Box<dyn std::error::Error>> {
-//! let contents = tryhard::retry_fn(|| read_file("Cargo.toml"))
-//!     .retries(10)
-//!     .exponential_backoff(Duration::from_millis(10))
-//!     .max_delay(Duration::from_secs(1))
-//!     .await?;
-//!
-//! assert!(contents.contains("tryhard"));
-//! # Ok(())
-//! # }
-//! ```
-//!
 //! ## Retrying several futures in the same way
 //!
 //! Using [`RetryFutureConfig`] you're able to retry several futures in the same way:
@@ -149,17 +127,6 @@
 //! is because it makes use of async timers. Feel free to open an issue if you need support for
 //! other runtimes.
 //!
-//! By default it uses Tokio 1.0. You can switch to Tokio 0.2 by disabling default features and
-//! enabling the `tokio-02` feature:
-//!
-//! ```toml
-//! tryhard = { version = "your-version", default-features = false, features = ["tokio-02"] }
-//! ```
-//!
-//! Note that enabling both Tokio 1.0 and 0.2 will cause a compilation error.
-//!
-//! Tokio 0.3 is not supported.
-//!
 //! [`RetryFuture`]: struct.RetryFuture.html
 
 // BEGIN - Embark standard lints v0.3
@@ -214,15 +181,16 @@
     rust_2018_idioms
 )]
 // END - Embark standard lints v0.3
+#![warn(missing_docs)]
+#![deny(broken_intra_doc_links)]
 
 use backoff_strategies::{
     BackoffStrategy, CustomBackoffStrategy, ExponentialBackoff, FixedBackoff, LinearBackoff,
     NoBackoff,
 };
-use futures::future::Ready;
 use futures::ready;
 use pin_project::pin_project;
-use std::{convert::Infallible, time::Duration};
+use std::time::Duration;
 use std::{
     fmt,
     future::Future,
@@ -230,16 +198,11 @@ use std::{
     task::{Context, Poll},
 };
 
-#[cfg(all(feature = "tokio-02", feature = "tokio-1"))]
-compile_error!("Cannot enable both tokio-02 and tokio-1 features");
-
-#[cfg(feature = "tokio-1")]
-use tokio_1 as tokio;
-
-#[cfg(feature = "tokio-02")]
-use tokio_02 as tokio;
+mod on_retry;
 
 pub mod backoff_strategies;
+
+pub use on_retry::{BoxOnRetry, NoOnRetry, OnRetry};
 
 /// Create a `RetryFn` which produces retryable futures.
 pub fn retry_fn<F>(f: F) -> RetryFn<F> {
@@ -420,14 +383,9 @@ where
     ///
     /// ```
     /// use std::sync::Arc;
-    /// #[cfg(feature = "tokio-1")]
-    /// use tokio_1 as tokio;
-    /// #[cfg(feature = "tokio-02")]
-    /// use tokio_02 as tokio;
     /// use tokio::sync::Mutex;
     ///
-    /// # #[cfg_attr(feature = "tokio-1", tokio::main(flavor = "current_thread"))]
-    /// # #[cfg_attr(feature = "tokio-02", tokio::main)]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let all_errors = Arc::new(Mutex::new(Vec::new()));
     ///
@@ -454,7 +412,7 @@ where
     #[inline]
     pub fn on_retry<F, OnRetryFuture>(self, f: F) -> RetryFuture<MakeFutureT, FutureT, BackoffT, F>
     where
-        F: FnMut(u32, Option<Duration>, &E) -> OnRetryFuture,
+        F: Fn(u32, Option<Duration>, &E) -> OnRetryFuture,
         OnRetryFuture: Future + Send + 'static,
         OnRetryFuture::Output: Send + 'static,
     {
@@ -571,7 +529,7 @@ impl<BackoffT, OnRetryT> RetryFutureConfig<BackoffT, OnRetryT> {
     #[inline]
     pub fn on_retry<F, OnRetryFuture, E>(self, f: F) -> RetryFutureConfig<BackoffT, F>
     where
-        F: FnMut(u32, Option<Duration>, &E) -> OnRetryFuture,
+        F: Fn(u32, Option<Duration>, &E) -> OnRetryFuture,
         OnRetryFuture: Future + Send + 'static,
         OnRetryFuture::Output: Send + 'static,
     {
@@ -593,6 +551,47 @@ impl<BackoffT, OnRetryT> RetryFutureConfig<BackoffT, OnRetryT> {
             max_delay: self.max_delay,
             max_retries: self.max_retries,
             on_retry: self.on_retry,
+        }
+    }
+
+    /// Convert the [`on_retry`] callback into a boxed trait object. This makes the type easier to
+    /// name.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tryhard::{
+    ///     RetryFutureConfig,
+    ///     BoxOnRetry,
+    ///     backoff_strategies::LinearBackoff,
+    /// };
+    /// use std::{io, time::Duration};
+    ///
+    /// let my_retry_config: RetryFutureConfig<LinearBackoff, BoxOnRetry<io::Error>> =
+    ///     RetryFutureConfig::new(10)
+    ///         .linear_backoff(Duration::from_millis(10))
+    ///         .on_retry(|_, _, error: &io::Error| {
+    ///             // the future we return here must be 'static so we cannot capture
+    ///             // `error` as its a reference.
+    ///             let error = error.to_string();
+    ///             async move {
+    ///                 println!("retrying because: {}", error);
+    ///             }
+    ///         })
+    ///         .boxed_on_retry();
+    /// ```
+    ///
+    /// [`on_retry`]: RetryFutureConfig::on_retry
+    pub fn boxed_on_retry<E>(self) -> RetryFutureConfig<BackoffT, BoxOnRetry<E>>
+    where
+        OnRetryT: OnRetry<E> + 'static,
+        OnRetryT::Future: Send + Sync + 'static,
+    {
+        RetryFutureConfig {
+            on_retry: self.on_retry.map(on_retry::BoxOnRetry::new),
+            backoff_strategy: self.backoff_strategy,
+            max_delay: self.max_delay,
+            max_retries: self.max_retries,
         }
     }
 }
@@ -619,19 +618,13 @@ where
 enum RetryState<F> {
     NotStarted,
     WaitingForFuture(#[pin] F),
-
-    #[cfg(feature = "tokio-1")]
     TimerActive(#[pin] tokio::time::Sleep),
-
-    #[cfg(feature = "tokio-02")]
-    TimerActive(#[pin] tokio::time::Delay),
 }
 
 impl<F, Fut, B, T, E, OnRetryT> Future for RetryFuture<F, Fut, B, OnRetryT>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
-    E: fmt::Display,
     B: BackoffStrategy<E>,
     B::Output: Into<RetryPolicy>,
     OnRetryT: OnRetry<E>,
@@ -697,11 +690,7 @@ where
                                 ));
                             }
 
-                            #[cfg(feature = "tokio-1")]
                             let delay = tokio::time::sleep(delay_duration);
-
-                            #[cfg(feature = "tokio-02")]
-                            let delay = tokio::time::delay_for(delay_duration);
 
                             RetryState::TimerActive(delay)
                         }
@@ -729,66 +718,6 @@ pub enum RetryPolicy {
 impl From<Duration> for RetryPolicy {
     fn from(duration: Duration) -> Self {
         RetryPolicy::Delay(duration)
-    }
-}
-
-/// Trait allowing you to run some future when a retry occurs. Could for example to be used for
-/// logging or other kinds of telemetry.
-///
-/// You wont have to implement this trait manually. It is implemented for functions with the right
-/// signature. See [`RetryFuture::on_retry`](struct.RetryFuture.html#method.on_retry) for more details.
-pub trait OnRetry<E> {
-    /// The type of the future you want to run.
-    type Future: 'static + Future<Output = Self::Output> + Send;
-
-    /// The output type of your future.
-    type Output: 'static + Send;
-
-    /// Create another future to run.
-    ///
-    /// If `next_delay` is `None` then your future is out of retries and wont be called again.
-    fn on_retry(
-        &mut self,
-        attempt: u32,
-        next_delay: Option<Duration>,
-        previous_error: &E,
-    ) -> Self::Future;
-}
-
-/// A sentinel value that represents doing nothing in between retries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NoOnRetry {
-    _cannot_exist: Infallible,
-}
-
-impl<E> OnRetry<E> for NoOnRetry {
-    type Future = Ready<Infallible>;
-    type Output = Infallible;
-
-    #[inline]
-    fn on_retry(&mut self, _: u32, _: Option<Duration>, _: &E) -> Self::Future {
-        // this is safe because `NoOnRetry` contains an `Infallible` so it cannot be created
-        unreachable!()
-    }
-}
-
-impl<F, E, FutureT> OnRetry<E> for F
-where
-    F: FnMut(u32, Option<Duration>, &E) -> FutureT,
-    FutureT: Future + Send + 'static,
-    FutureT::Output: Send + 'static,
-{
-    type Output = FutureT::Output;
-    type Future = FutureT;
-
-    #[inline]
-    fn on_retry(
-        &mut self,
-        attempts: u32,
-        next_delay: Option<Duration>,
-        previous_error: &E,
-    ) -> Self::Future {
-        self(attempts, next_delay, previous_error)
     }
 }
 
@@ -967,5 +896,36 @@ mod tests {
             .unwrap_err();
         assert_eq!(err_value, "foo");
         assert_eq!(counter.load(Ordering::SeqCst), 10);
+    }
+
+    #[tokio::test]
+    async fn reusing_boxed_config() {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+        #[derive(Debug, PartialEq, Eq)]
+        struct MyError(&'static str);
+
+        let config: RetryFutureConfig<LinearBackoff, BoxOnRetry<MyError>> =
+            RetryFutureConfig::new(10)
+                .max_delay(Duration::from_secs(1))
+                .linear_backoff(Duration::from_millis(10))
+                .on_retry(|_, _, _error: &MyError| async move {
+                    COUNTER.fetch_add(1, Ordering::SeqCst);
+                })
+                .boxed_on_retry();
+
+        let ok_value = retry_fn(|| async { Ok::<_, MyError>(true) })
+            .with_config(config.clone())
+            .await
+            .unwrap();
+        assert!(ok_value);
+        assert_eq!(COUNTER.load(Ordering::SeqCst), 0);
+
+        let err_value = retry_fn(|| async { Err::<(), _>(MyError("error")) })
+            .with_config(config)
+            .await
+            .unwrap_err();
+        assert_eq!(err_value, MyError("error"));
+        assert_eq!(COUNTER.load(Ordering::SeqCst), 10);
     }
 }
