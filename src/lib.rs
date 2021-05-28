@@ -584,7 +584,7 @@ impl<BackoffT, OnRetryT> RetryFutureConfig<BackoffT, OnRetryT> {
     /// [`on_retry`]: RetryFutureConfig::on_retry
     pub fn boxed_on_retry<E>(self) -> RetryFutureConfig<BackoffT, BoxOnRetry<E>>
     where
-        OnRetryT: OnRetry<E> + 'static,
+        OnRetryT: OnRetry<E> + Send + Sync + 'static,
         OnRetryT::Future: Send + Sync + 'static,
     {
         RetryFutureConfig {

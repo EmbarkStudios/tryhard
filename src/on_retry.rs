@@ -61,7 +61,7 @@ where
 ///
 /// [`RetryFutureConfig::boxed_on_retry`]: crate::RetryFutureConfig::boxed_on_retry
 pub struct BoxOnRetry<E> {
-    inner: Arc<dyn OnRetry<E, Future = BoxFuture<'static, ()>>>,
+    inner: Arc<dyn OnRetry<E, Future = BoxFuture<'static, ()>> + Send + Sync + 'static>,
 }
 
 impl<E> Clone for BoxOnRetry<E> {
@@ -100,7 +100,7 @@ where
 impl<E> BoxOnRetry<E> {
     pub(crate) fn new<T>(inner: T) -> Self
     where
-        T: OnRetry<E> + 'static,
+        T: OnRetry<E> + Send + Sync + 'static,
         T::Future: Send + Sync + 'static,
     {
         Self {
