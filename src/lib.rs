@@ -631,7 +631,6 @@ impl<F, Fut, B, T, E, OnRetryT> Future for RetryFuture<F, Fut, B, OnRetryT>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
-    E: fmt::Display,
     B: BackoffStrategy<E>,
     B::Output: Into<RetryPolicy>,
     OnRetryT: OnRetry<E>,
