@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Changed
-- N/A
+- `RetryFuture` no longer requires the error type to implement `Display`.
 
 ### Deprecated
 - N/A
