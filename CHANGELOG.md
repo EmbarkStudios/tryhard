@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The output of the future returned by `OnRetry::on_retry` has been
   fixed to `()`. As the future is given to `tokio::spawn` requiring `()` is
   nicer. It also simplified some trait bounds on `BoxOnRetry`.
+- `RetryFuture` no longer requires the error type to implement `Display`.
 
 ### Deprecated
 - N/A

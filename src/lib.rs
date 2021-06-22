@@ -398,7 +398,7 @@ where
     ///     Err::<(), _>("fail")
     /// })
     ///     .retries(10)
-    ///     .on_retry(|_attempt, _next_delay, error| {
+    ///     .on_retry(|_attempt, _next_delay, error: &&'static str| {
     ///         // the future must be `'static` so it cannot contain references
     ///         let all_errors = Arc::clone(&all_errors);
     ///         let error = error.clone();
