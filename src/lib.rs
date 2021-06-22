@@ -432,7 +432,7 @@ where
 pub struct RetryFutureConfig<BackoffT, OnRetryT> {
     backoff_strategy: BackoffT,
     max_delay: Option<Duration>,
-    on_retry: OnRetryT,
+    on_retry: Option<OnRetryT>,
     max_retries: u32,
 }
 
@@ -442,7 +442,7 @@ impl RetryFutureConfig<NoBackoff, NoOnRetry> {
         Self {
             backoff_strategy: NoBackoff,
             max_delay: None,
-            on_retry: NoOnRetry,
+            on_retry: None::<NoOnRetry>,
             max_retries,
         }
     }
@@ -515,7 +515,7 @@ impl<BackoffT, OnRetryT> RetryFutureConfig<BackoffT, OnRetryT> {
             backoff_strategy: self.backoff_strategy,
             max_delay: self.max_delay,
             max_retries: self.max_retries,
-            on_retry: f,
+            on_retry: Some(f),
         }
     }
 }
@@ -573,11 +573,9 @@ where
                     }
                     Err(error) => {
                         if *this.attempts_remaining == 0 {
-                            tokio::spawn(this.config.on_retry.on_retry(
-                                *this.attempt,
-                                None,
-                                &error,
-                            ));
+                            if let Some(on_retry) = &mut this.config.on_retry {
+                                tokio::spawn(on_retry.on_retry(*this.attempt, None, &error));
+                            }
 
                             return Poll::Ready(Err(error));
                         } else {
@@ -592,11 +590,13 @@ where
                             let mut delay_duration = match delay {
                                 RetryPolicy::Delay(duration) => duration,
                                 RetryPolicy::Break => {
-                                    tokio::spawn(this.config.on_retry.on_retry(
-                                        *this.attempt,
-                                        None,
-                                        &error,
-                                    ));
+                                    if let Some(on_retry) = &mut this.config.on_retry {
+                                        tokio::spawn(on_retry.on_retry(
+                                            *this.attempt,
+                                            None,
+                                            &error,
+                                        ));
+                                    }
 
                                     return Poll::Ready(Err(error));
                                 }
@@ -606,11 +606,13 @@ where
                                 delay_duration = delay_duration.min(max_delay);
                             }
 
-                            tokio::spawn(this.config.on_retry.on_retry(
-                                *this.attempt,
-                                Some(delay_duration),
-                                &error,
-                            ));
+                            if let Some(on_retry) = &mut this.config.on_retry {
+                                tokio::spawn(on_retry.on_retry(
+                                    *this.attempt,
+                                    Some(delay_duration),
+                                    &error,
+                                ));
+                            }
 
                             let delay = tokio::time::sleep(delay_duration);
 

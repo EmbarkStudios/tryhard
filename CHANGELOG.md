@@ -11,15 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Explicit constructs have been added to each back-off strategy. This makes it
   possible to define a new strategy that wraps one of the types provided by
   tryhard.
-- `NoOnRetry` now has a public constructor.
 
 ### Changed
 - `BackoffStrategy` is now generic over the lifetime of the error given to
   `BackoffStrategy::delay`.
 - The output of the future returned by `OnRetry::on_retry` has been
   fixed to `()`. As the future is given to `tokio::spawn` requiring `()` is
-  nicer. It also simplified some trait bounds on `BoxOnRetry`.
-- `RetryFuture` no longer requires the error type to implement `Display`.
+  nicer.
 
 ### Deprecated
 - N/A
@@ -31,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   supported.
 
 ### Fixed
-- N/A
+- `RetryFuture` no longer requires the error type to implement `Display`.
 
 ### Security
 - N/A

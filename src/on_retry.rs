@@ -1,5 +1,5 @@
 use futures::future::Ready;
-use std::{future::Future, time::Duration};
+use std::{convert::Infallible, future::Future, time::Duration};
 
 /// Trait allowing you to run some future when a retry occurs. Could for example to be used for
 /// logging or other kinds of telemetry.
@@ -23,14 +23,16 @@ pub trait OnRetry<E> {
 
 /// A sentinel value that represents doing nothing in between retries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NoOnRetry;
+pub struct NoOnRetry {
+    cannot_exist: Infallible,
+}
 
 impl<E> OnRetry<E> for NoOnRetry {
     type Future = Ready<()>;
 
     #[inline]
     fn on_retry(&mut self, _: u32, _: Option<Duration>, _: &E) -> Self::Future {
-        futures::future::ready(())
+        match self.cannot_exist {}
     }
 }
 
