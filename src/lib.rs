@@ -840,10 +840,30 @@ mod tests {
             }
         }
 
-        let config: RetryFutureConfig<MyBackoffStrategy, NoOnRetry> = RetryFutureConfig::new(10)
+        #[derive(Clone)]
+        struct MyOnRetry;
+
+        impl OnRetry<std::io::Error> for MyOnRetry {
+            type Future = futures::future::BoxFuture<'static, ()>;
+
+            fn on_retry(
+                &mut self,
+                attempt: u32,
+                next_delay: Option<Duration>,
+                previous_error: &std::io::Error,
+            ) -> Self::Future {
+                let previous_error = previous_error.to_string();
+                Box::pin(async move {
+                    println!("{} {:?} {}", attempt, next_delay, previous_error);
+                })
+            }
+        }
+
+        let config: RetryFutureConfig<MyBackoffStrategy, MyOnRetry> = RetryFutureConfig::new(10)
             .custom_backoff(MyBackoffStrategy {
                 inner: ExponentialBackoff::new(Duration::from_millis(10)),
-            });
+            })
+            .on_retry(MyOnRetry);
 
         retry_fn(|| async { Ok::<_, std::io::Error>(true) })
             .with_config(config.clone())
