@@ -11,8 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Explicit constructs have been added to each back-off strategy. This makes it
   possible to define a new strategy that wraps one of the types provided by
   tryhard.
-- Added `RetryFutureConfig::const_new` which can be used to construct a
-  `RetryFutureConfig` in a `const` context.
 - `NoOnRetry` now has a public constructor.
 
 ### Changed

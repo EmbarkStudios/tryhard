@@ -38,7 +38,7 @@ pub struct ExponentialBackoff {
 
 impl ExponentialBackoff {
     /// Create a new `ExponentialBackoff` with an initial delay.
-    pub const fn new(initial_delay: Duration) -> Self {
+    pub fn new(initial_delay: Duration) -> Self {
         Self {
             delay: initial_delay,
         }
@@ -64,7 +64,7 @@ pub struct FixedBackoff {
 
 impl FixedBackoff {
     /// Create a new `FixedBackoff` with an initial delay.
-    pub const fn new(initial_delay: Duration) -> Self {
+    pub fn new(initial_delay: Duration) -> Self {
         Self {
             delay: initial_delay,
         }
@@ -88,7 +88,7 @@ pub struct LinearBackoff {
 
 impl LinearBackoff {
     /// Create a new `LinearBackoff` with an initial delay.
-    pub const fn new(initial_delay: Duration) -> Self {
+    pub fn new(initial_delay: Duration) -> Self {
         Self {
             delay: initial_delay,
         }

@@ -449,37 +449,6 @@ impl RetryFutureConfig<NoBackoff, NoOnRetry> {
 }
 
 impl<BackoffT, OnRetryT> RetryFutureConfig<BackoffT, OnRetryT> {
-    /// Create a new `RetryFutureConfig`.
-    ///
-    /// This method is usable in "const context":
-    ///
-    /// ```rust
-    /// use std::time::Duration;
-    /// use tryhard::{RetryFutureConfig, NoOnRetry, backoff_strategies::LinearBackoff};
-    ///
-    /// const CONFIG: RetryFutureConfig<LinearBackoff, NoOnRetry> = RetryFutureConfig::const_new(
-    ///     10,
-    ///     LinearBackoff::new(Duration::from_millis(10)),
-    ///     Some(Duration::from_secs(10)),
-    ///     NoOnRetry,
-    /// );
-    /// ```
-    pub const fn const_new(
-        max_retries: u32,
-        backoff_strategy: BackoffT,
-        max_delay: Option<Duration>,
-        on_retry: OnRetryT,
-    ) -> Self {
-        Self {
-            backoff_strategy,
-            max_delay,
-            on_retry,
-            max_retries,
-        }
-    }
-}
-
-impl<BackoffT, OnRetryT> RetryFutureConfig<BackoffT, OnRetryT> {
     /// Set the max duration to sleep between each attempt.
     #[inline]
     pub fn max_delay(mut self, delay: Duration) -> Self {
