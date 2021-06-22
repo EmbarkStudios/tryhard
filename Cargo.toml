@@ -16,19 +16,8 @@ keywords = ["tokio", "futures", "retry"]
 futures = "0.3"
 pin-project = "1"
 
-[dependencies.tokio-1]
+[dependencies.tokio]
 package = "tokio"
 version = "1"
 default-features = false
 features = ["rt", "time", "macros", "test-util", "sync"]
-optional = true
-
-[dependencies.tokio-02]
-package = "tokio"
-version = "0.2"
-default-features = false
-features = ["time", "macros", "test-util", "rt-core", "sync"]
-optional = true
-
-[features]
-default = ["tokio-1"]

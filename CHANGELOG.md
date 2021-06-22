@@ -4,21 +4,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [Unreleased]
 ### Added
-- N/A
+- `BackoffStrategy` is now implemented directly for functions of the right type.
+- Explicit constructs have been added to each back-off strategy. This makes it
+  possible to define a new strategy that wraps one of the types provided by
+  tryhard.
 
 ### Changed
-- `RetryFuture` no longer requires the error type to implement `Display`.
+- `BackoffStrategy` is now generic over the lifetime of the error given to
+  `BackoffStrategy::delay`.
+- The output of the future returned by `OnRetry::on_retry` has been
+  fixed to `()`. As the future is given to `tokio::spawn` requiring `()` is
+  nicer.
 
 ### Deprecated
 - N/A
 
 ### Removed
-- N/A
+- `CustomBackoffStrategy` has been removed since `BackoffStrategy` is now
+  implemented directly on functions of the right type.
+- Tokio 0.2 support has been removed. Tokio 1 is now the only version
+  supported.
 
 ### Fixed
-- N/A
+- `RetryFuture` no longer requires the error type to implement `Display`.
 
 ### Security
 - N/A

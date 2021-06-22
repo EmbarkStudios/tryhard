@@ -1,11 +1,10 @@
 //! The types of backoff strategies that are supported
 
 use crate::RetryPolicy;
-use std::fmt;
 use std::time::Duration;
 
 /// Trait for computing the amount of delay between attempts.
-pub trait BackoffStrategy<E> {
+pub trait BackoffStrategy<'a, E> {
     /// The delay type. Will normally be either [`Duration`] or [`RetryPolicy`].
     ///
     /// [`Duration`]: https://doc.rust-lang.org/stable/std/time/struct.Duration.html
@@ -14,7 +13,7 @@ pub trait BackoffStrategy<E> {
 
     /// Compute the amount of delay given the number of attempts so far and the most previous
     /// error.
-    fn delay(&mut self, attempt: u32, error: &E) -> Self::Output;
+    fn delay(&mut self, attempt: u32, error: &'a E) -> Self::Output;
 }
 
 /// No backoff. This will make the future be retried immediately without any delay in between
@@ -22,11 +21,11 @@ pub trait BackoffStrategy<E> {
 #[derive(Debug, Clone, Copy)]
 pub struct NoBackoff;
 
-impl<E> BackoffStrategy<E> for NoBackoff {
+impl<'a, E> BackoffStrategy<'a, E> for NoBackoff {
     type Output = Duration;
 
     #[inline]
-    fn delay(&mut self, _attempt: u32, _error: &E) -> Duration {
+    fn delay(&mut self, _attempt: u32, _error: &'a E) -> Duration {
         Duration::new(0, 0)
     }
 }
@@ -37,11 +36,20 @@ pub struct ExponentialBackoff {
     pub(crate) delay: Duration,
 }
 
-impl<E> BackoffStrategy<E> for ExponentialBackoff {
+impl ExponentialBackoff {
+    /// Create a new `ExponentialBackoff` with an initial delay.
+    pub fn new(initial_delay: Duration) -> Self {
+        Self {
+            delay: initial_delay,
+        }
+    }
+}
+
+impl<'a, E> BackoffStrategy<'a, E> for ExponentialBackoff {
     type Output = Duration;
 
     #[inline]
-    fn delay(&mut self, _attempt: u32, _error: &E) -> Duration {
+    fn delay(&mut self, _attempt: u32, _error: &'a E) -> Duration {
         let prev_delay = self.delay;
         self.delay *= 2;
         prev_delay
@@ -54,11 +62,20 @@ pub struct FixedBackoff {
     pub(crate) delay: Duration,
 }
 
-impl<E> BackoffStrategy<E> for FixedBackoff {
+impl FixedBackoff {
+    /// Create a new `FixedBackoff` with an initial delay.
+    pub fn new(initial_delay: Duration) -> Self {
+        Self {
+            delay: initial_delay,
+        }
+    }
+}
+
+impl<'a, E> BackoffStrategy<'a, E> for FixedBackoff {
     type Output = Duration;
 
     #[inline]
-    fn delay(&mut self, _attempt: u32, _error: &E) -> Duration {
+    fn delay(&mut self, _attempt: u32, _error: &'a E) -> Duration {
         self.delay
     }
 }
@@ -69,55 +86,34 @@ pub struct LinearBackoff {
     pub(crate) delay: Duration,
 }
 
-impl<E> BackoffStrategy<E> for LinearBackoff {
+impl LinearBackoff {
+    /// Create a new `LinearBackoff` with an initial delay.
+    pub fn new(initial_delay: Duration) -> Self {
+        Self {
+            delay: initial_delay,
+        }
+    }
+}
+
+impl<'a, E> BackoffStrategy<'a, E> for LinearBackoff {
     type Output = Duration;
 
     #[inline]
-    fn delay(&mut self, attempt: u32, _error: &E) -> Duration {
+    fn delay(&mut self, attempt: u32, _error: &'a E) -> Duration {
         self.delay * attempt
     }
 }
 
-/// A custom backoff strategy defined by a function.
-#[derive(Clone, Copy)]
-pub struct CustomBackoffStrategy<F> {
-    pub(crate) f: F,
-}
-
-impl<F, E, T> BackoffStrategy<E> for CustomBackoffStrategy<F>
+impl<'a, F, E, T> BackoffStrategy<'a, E> for F
 where
-    F: FnMut(u32, &E) -> T,
+    E: 'a,
+    F: FnMut(u32, &'a E) -> T,
     T: Into<RetryPolicy>,
 {
     type Output = RetryPolicy;
 
     #[inline]
-    fn delay(&mut self, attempt: u32, error: &E) -> RetryPolicy {
-        (self.f)(attempt, error).into()
-    }
-}
-
-impl<F> fmt::Debug for CustomBackoffStrategy<F> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CustomBackoffStrategy")
-            .field("f", &format_args!("<{}>", std::any::type_name::<F>()))
-            .finish()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::convert::Infallible;
-
-    #[test]
-    fn custom_has_useful_debug_impl() {
-        let f = |_: u32, _: Infallible| Duration::from_secs(1);
-        let backoff = CustomBackoffStrategy { f };
-
-        assert_eq!(
-            format!("{:?}", backoff),
-            "CustomBackoffStrategy { f: <tryhard::backoff_strategies::tests::custom_has_useful_debug_impl::{{closure}}> }",
-        );
+    fn delay(&mut self, attempt: u32, error: &'a E) -> RetryPolicy {
+        self(attempt, error).into()
     }
 }
