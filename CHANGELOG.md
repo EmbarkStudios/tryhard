@@ -4,8 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [Unreleased]
+### Added
+- N/A
+
+### Changed
+- N/A
+
+### Deprecated
+- N/A
+
+### Removed
+- N/A
+
+### Fixed
+- N/A
+
+### Security
+- N/A
+
+## [0.4.0] - 2021-06-22
 ### Added
 - `BackoffStrategy` is now implemented directly for functions of the right type.
 - Explicit constructs have been added to each back-off strategy. This makes it
@@ -54,7 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - First release!
 
-[Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.3.0...HEAD
+[0.4.0]: https://github.com/EmbarkStudios/tryhard/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/EmbarkStudios/tryhard/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/EmbarkStudios/tryhard/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/EmbarkStudios/tryhard/releases/tag/0.1.0
