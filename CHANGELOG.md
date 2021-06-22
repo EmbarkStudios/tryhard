@@ -7,21 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Added `RetryFutureConfig::boxed_on_retry` which converts the `on_retry`
-  callback into a boxed trait object which makes the type easier to name.
+- `BackoffStrategy` is now implemented directly for functions of the right type.
+- Explicit constructs have been added to each back-off strategy. This makes it
+  possible to define a new strategy that wraps one of the types provided by
+  tryhard.
+- Added `RetryFutureConfig::const_new` which can be used to construct a
+  `RetryFutureConfig` in a `const` context.
+- `NoOnRetry` now has a public constructor.
 
 ### Changed
-- `OnRetry::on_retry` no longer receives `&mut self` but instead
-  `&self`. That was necessary to implement `BoxOnRetry`. Users who need mutation
-  in their callbacks should use a mutex.
+- `BackoffStrategy` is now generic over the lifetime of the error given to
+  `BackoffStrategy::delay`.
 - The output of the future returned by `OnRetry::on_retry` has been
-  fixed to `()`. As the future is given to `tokio::spawn` I think requiring `()`
-  is nicer. It also simplified some trait bounds on `BoxOnRetry`.
+  fixed to `()`. As the future is given to `tokio::spawn` requiring `()` is
+  nicer. It also simplified some trait bounds on `BoxOnRetry`.
 
 ### Deprecated
 - N/A
 
 ### Removed
+- `CustomBackoffStrategy` has been removed since `BackoffStrategy` is now
+  implemented directly on functions of the right type.
 - Tokio 0.2 support has been removed. Tokio 1 is now the only version
   supported.
 
