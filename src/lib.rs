@@ -164,7 +164,6 @@
     clippy::needless_borrow,
     clippy::needless_continue,
     clippy::option_option,
-    clippy::pub_enum_variant_names,
     clippy::ref_option_ref,
     clippy::rest_pat_in_fully_bound_structs,
     clippy::string_add_assign,
@@ -188,7 +187,7 @@ use backoff_strategies::{
     BackoffStrategy, ExponentialBackoff, FixedBackoff, LinearBackoff, NoBackoff,
 };
 use futures::ready;
-use pin_project::pin_project;
+use pin_project_lite::pin_project;
 use std::time::Duration;
 use std::{
     fmt,
@@ -239,17 +238,18 @@ where
     }
 }
 
-/// A retryable future.
-///
-/// Can be created by calling [`retry_fn`](fn.retry_fn.html).
-#[pin_project]
-pub struct RetryFuture<MakeFutureT, FutureT, BackoffT, OnRetryT> {
-    make_future: MakeFutureT,
-    attempts_remaining: u32,
-    #[pin]
-    state: RetryState<FutureT>,
-    attempt: u32,
-    config: RetryFutureConfig<BackoffT, OnRetryT>,
+pin_project! {
+    /// A retryable future.
+    ///
+    /// Can be created by calling [`retry_fn`](fn.retry_fn.html).
+    pub struct RetryFuture<MakeFutureT, FutureT, BackoffT, OnRetryT> {
+        make_future: MakeFutureT,
+        attempts_remaining: u32,
+        #[pin]
+        state: RetryState<FutureT>,
+        attempt: u32,
+        config: RetryFutureConfig<BackoffT, OnRetryT>,
+    }
 }
 
 impl<MakeFutureT, FutureT, BackoffT, T, E, OnRetryT>
@@ -537,12 +537,14 @@ where
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-#[pin_project(project = RetryStateProj)]
-enum RetryState<F> {
-    NotStarted,
-    WaitingForFuture(#[pin] F),
-    TimerActive(#[pin] tokio::time::Sleep),
+pin_project! {
+    #[project = RetryStateProj]
+    #[allow(clippy::large_enum_variant)]
+    enum RetryState<F> {
+        NotStarted,
+        WaitingForFuture { #[pin] future: F },
+        TimerActive { #[pin] sleep: tokio::time::Sleep },
+    }
 }
 
 impl<F, Fut, B, T, E, OnRetryT> Future for RetryFuture<F, Fut, B, OnRetryT>
@@ -560,14 +562,18 @@ where
             let this = self.as_mut().project();
 
             let new_state = match this.state.project() {
-                RetryStateProj::NotStarted => RetryState::WaitingForFuture((this.make_future)()),
+                RetryStateProj::NotStarted => RetryState::WaitingForFuture {
+                    future: (this.make_future)(),
+                },
 
-                RetryStateProj::TimerActive(delay) => {
-                    ready!(delay.poll(cx));
-                    RetryState::WaitingForFuture((this.make_future)())
+                RetryStateProj::TimerActive { sleep } => {
+                    ready!(sleep.poll(cx));
+                    RetryState::WaitingForFuture {
+                        future: (this.make_future)(),
+                    }
                 }
 
-                RetryStateProj::WaitingForFuture(fut) => match ready!(fut.poll(cx)) {
+                RetryStateProj::WaitingForFuture { future } => match ready!(future.poll(cx)) {
                     Ok(value) => {
                         return Poll::Ready(Ok(value));
                     }
@@ -614,9 +620,9 @@ where
                                 ));
                             }
 
-                            let delay = tokio::time::sleep(delay_duration);
+                            let sleep = tokio::time::sleep(delay_duration);
 
-                            RetryState::TimerActive(delay)
+                            RetryState::TimerActive { sleep }
                         }
                     }
                 },
