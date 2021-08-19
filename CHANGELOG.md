@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Changed
-- Move to `pin-project-lite` instead of `pin-project`.
+- Move to `pin-project-lite` instead of `pin-project` ([#21](https://github.com/EmbarkStudios/tryhard/pull/21))
 
 ### Deprecated
 - N/A
