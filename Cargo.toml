@@ -14,7 +14,7 @@ keywords = ["tokio", "futures", "retry"]
 
 [dependencies]
 futures = "0.3"
-pin-project = "1"
+pin-project-lite = "0.2"
 
 [dependencies.tokio]
 package = "tokio"
