@@ -414,7 +414,10 @@ where
     /// # }
     /// ```
     #[inline]
-    pub fn on_retry<F>(self, f: F) -> RetryFuture<MakeFutureT, FutureT, BackoffT, F> {
+    pub fn on_retry<F, OnRetryFut>(self, f: F) -> RetryFuture<MakeFutureT, FutureT, BackoffT, F>
+    where
+        F: for<'a> Fn(u32, Option<Duration>, &E) -> OnRetryFut,
+    {
         RetryFuture {
             make_future: self.make_future,
             attempts_remaining: self.attempts_remaining,
