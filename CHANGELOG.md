@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Changed
-- Move to `pin-project-lite` instead of `pin-project` ([#21](https://github.com/EmbarkStudios/tryhard/pull/21))
+- N/A
 
 ### Deprecated
 - N/A
@@ -18,10 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Fixed
-- Fixed inference issues with `RetryFuture::on_retry` ([#22])
+- N/A
 
 ### Security
 - N/A
+
+[#22]: https://github.com/EmbarkStudios/tryhard/pull/22
+
+## [0.5.0] - 2022-09-01
+### Changed
+- Move to `pin-project-lite` instead of `pin-project` ([#21](https://github.com/EmbarkStudios/tryhard/pull/21))
+- `RetryFuture::on_retry` has additional type parameter and trait bound ([#22])
+
+### Fixed
+- Fixed inference issues with `RetryFuture::on_retry` ([#22])
 
 [#22]: https://github.com/EmbarkStudios/tryhard/pull/22
 
@@ -74,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - First release!
 
-[Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/EmbarkStudios/tryhard/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/EmbarkStudios/tryhard/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/EmbarkStudios/tryhard/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/EmbarkStudios/tryhard/compare/0.1.0...0.2.0
