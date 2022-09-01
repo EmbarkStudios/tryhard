@@ -414,7 +414,10 @@ where
     /// # }
     /// ```
     #[inline]
-    pub fn on_retry<F>(self, f: F) -> RetryFuture<MakeFutureT, FutureT, BackoffT, F> {
+    pub fn on_retry<F, OnRetryFut>(self, f: F) -> RetryFuture<MakeFutureT, FutureT, BackoffT, F>
+    where
+        F: Fn(u32, Option<Duration>, &E) -> OnRetryFut,
+    {
         RetryFuture {
             make_future: self.make_future,
             attempts_remaining: self.attempts_remaining,
@@ -880,5 +883,16 @@ mod tests {
             .with_config(config)
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn inference_works() {
+        // See https://github.com/EmbarkStudios/tryhard/issues/20 for details.
+        let _ = async {
+            let _ = retry_fn(|| async { Result::<_, Infallible>::Ok(()) })
+                .retries(0)
+                .on_retry(|_, _, _| async {})
+                .await;
+        };
     }
 }
