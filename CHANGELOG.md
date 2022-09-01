@@ -18,10 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Fixed
-- N/A
+- Fixed inference issues with `RetryFuture::on_retry` ([#22])
 
 ### Security
 - N/A
+
+[#22]: https://github.com/EmbarkStudios/tryhard/pull/22
 
 ## [0.4.0] - 2021-06-22
 ### Added
