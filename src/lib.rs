@@ -181,7 +181,7 @@
 )]
 // END - Embark standard lints v0.3
 #![warn(missing_docs)]
-#![deny(broken_intra_doc_links)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 use backoff_strategies::{
     BackoffStrategy, ExponentialBackoff, FixedBackoff, LinearBackoff, NoBackoff,
