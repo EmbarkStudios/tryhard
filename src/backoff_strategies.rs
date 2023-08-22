@@ -51,7 +51,7 @@ impl<'a, E> BackoffStrategy<'a, E> for ExponentialBackoff {
     #[inline]
     fn delay(&mut self, _attempt: u32, _error: &'a E) -> Duration {
         let prev_delay = self.delay;
-        self.delay *= 2;
+        self.delay = self.delay.saturating_mul(2);
         prev_delay
     }
 }
@@ -100,7 +100,7 @@ impl<'a, E> BackoffStrategy<'a, E> for LinearBackoff {
 
     #[inline]
     fn delay(&mut self, attempt: u32, _error: &'a E) -> Duration {
-        self.delay * attempt
+        self.delay.saturating_mul(attempt)
     }
 }
 

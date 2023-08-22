@@ -888,11 +888,11 @@ mod tests {
     #[tokio::test]
     async fn inference_works() {
         // See https://github.com/EmbarkStudios/tryhard/issues/20 for details.
-        let _ = async {
+        std::mem::drop(async {
             let _ = retry_fn(|| async { Result::<_, Infallible>::Ok(()) })
                 .retries(0)
                 .on_retry(|_, _, _| async {})
                 .await;
-        };
+        });
     }
 }
