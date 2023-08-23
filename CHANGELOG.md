@@ -23,7 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - N/A
 
-[#22]: https://github.com/EmbarkStudios/tryhard/pull/22
+
+## [0.5.1] - 2023-08-23
+### Fixed
+- Use `saturating_mul` instead of `Mul` ([#27])
+
+[#27]: https://github.com/EmbarkStudios/tryhard/pull/27
 
 ## [0.5.0] - 2022-09-01
 ### Changed
