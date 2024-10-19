@@ -6,10 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- N/A
+- N/A.
 
 ### Changed
 - Moved the `futures` dependency to `dev-dependencies`. MSRV is now 1.48.
+- Moved the `tokio` dependency's `macros`, `sync`, and `test-util` features
+  to `dev-dependencies`. This allows calling crates to avoid the extra
+  complexity that `test-util` adds to tokio time-keeping operations.
 
 ### Deprecated
 - N/A
