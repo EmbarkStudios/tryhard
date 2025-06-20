@@ -186,7 +186,6 @@
 use backoff_strategies::{
     BackoffStrategy, ExponentialBackoff, FixedBackoff, LinearBackoff, NoBackoff,
 };
-use futures::ready;
 use pin_project_lite::pin_project;
 use std::time::Duration;
 use std::{
@@ -569,18 +568,19 @@ where
                     future: (this.make_future)(),
                 },
 
-                RetryStateProj::TimerActive { sleep } => {
-                    ready!(sleep.poll(cx));
-                    RetryState::WaitingForFuture {
+                RetryStateProj::TimerActive { sleep } => match sleep.poll(cx) {
+                    Poll::Ready(()) => RetryState::WaitingForFuture {
                         future: (this.make_future)(),
-                    }
-                }
+                    },
+                    Poll::Pending => return Poll::Pending,
+                },
 
-                RetryStateProj::WaitingForFuture { future } => match ready!(future.poll(cx)) {
-                    Ok(value) => {
+                RetryStateProj::WaitingForFuture { future } => match future.poll(cx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(Ok(value)) => {
                         return Poll::Ready(Ok(value));
                     }
-                    Err(error) => {
+                    Poll::Ready(Err(error)) => {
                         if *this.attempts_remaining == 0 {
                             if let Some(on_retry) = &mut this.config.on_retry {
                                 tokio::spawn(on_retry.on_retry(*this.attempt, None, &error));

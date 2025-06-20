@@ -13,7 +13,6 @@ categories = ["rust-patterns"]
 keywords = ["tokio", "futures", "retry"]
 
 [dependencies]
-futures = "0.3"
 pin-project-lite = "0.2"
 
 [dependencies.tokio]
@@ -21,3 +20,6 @@ package = "tokio"
 version = "1"
 default-features = false
 features = ["rt", "time", "macros", "test-util", "sync"]
+
+[dev-dependencies]
+futures = "0.3"

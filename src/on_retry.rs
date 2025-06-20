@@ -1,5 +1,8 @@
-use futures::future::Ready;
-use std::{convert::Infallible, future::Future, time::Duration};
+use std::{
+    convert::Infallible,
+    future::{Future, Ready},
+    time::Duration,
+};
 
 /// Trait allowing you to run some future when a retry occurs. Could for example to be used for
 /// logging or other kinds of telemetry.
