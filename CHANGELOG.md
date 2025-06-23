@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - N/A
 
+## [0.5.2] - 2025-06-23
+
+### Changed
+- Moved the `futures` dependency to `dev-dependencies`
+- MSRV is now 1.48. Since we don't have a stated MSRV policy and 1.48 is almost older than this
+crate, much less version `0.5.0`, I am fine with doing this in a patch release.
 
 ## [0.5.1] - 2023-08-23
 ### Fixed
@@ -89,7 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - First release!
 
-[Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tryhard/compare/0.5.2...HEAD
+[0.5.2]: https://github.com/EmbarkStudios/tryhard/compare/0.5.1...0.5.2
+[0.5.1]: https://github.com/EmbarkStudios/tryhard/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/EmbarkStudios/tryhard/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/EmbarkStudios/tryhard/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/EmbarkStudios/tryhard/compare/0.2.0...0.3.0
