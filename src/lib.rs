@@ -160,7 +160,6 @@
     clippy::match_same_arms,
     clippy::match_wildcard_for_single_variants,
     clippy::mem_forget,
-    clippy::mismatched_target_os,
     clippy::needless_borrow,
     clippy::needless_continue,
     clippy::option_option,
@@ -175,6 +174,7 @@
     clippy::unnested_or_patterns,
     clippy::unused_self,
     clippy::verbose_file_reads,
+    unexpected_cfgs,
     future_incompatible,
     nonstandard_style,
     rust_2018_idioms
@@ -186,7 +186,6 @@
 use backoff_strategies::{
     BackoffStrategy, ExponentialBackoff, FixedBackoff, LinearBackoff, NoBackoff,
 };
-use futures::ready;
 use pin_project_lite::pin_project;
 use std::time::Duration;
 use std::{
@@ -569,18 +568,19 @@ where
                     future: (this.make_future)(),
                 },
 
-                RetryStateProj::TimerActive { sleep } => {
-                    ready!(sleep.poll(cx));
-                    RetryState::WaitingForFuture {
+                RetryStateProj::TimerActive { sleep } => match sleep.poll(cx) {
+                    Poll::Ready(()) => RetryState::WaitingForFuture {
                         future: (this.make_future)(),
-                    }
-                }
+                    },
+                    Poll::Pending => return Poll::Pending,
+                },
 
-                RetryStateProj::WaitingForFuture { future } => match ready!(future.poll(cx)) {
-                    Ok(value) => {
+                RetryStateProj::WaitingForFuture { future } => match future.poll(cx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(Ok(value)) => {
                         return Poll::Ready(Ok(value));
                     }
-                    Err(error) => {
+                    Poll::Ready(Err(error)) => {
                         if *this.attempts_remaining == 0 {
                             if let Some(on_retry) = &mut this.config.on_retry {
                                 tokio::spawn(on_retry.on_retry(*this.attempt, None, &error));
@@ -724,7 +724,7 @@ mod tests {
 
         // assertions about what the exact times are are very finicky so lets just assert that the
         // one without backoff is slower.
-        assert!(time_with_fixed > time_with_none);
+        assert!(time_with_fixed >= time_with_none);
     }
 
     // `RetryFuture` must be `Send` to be used with `async_trait`

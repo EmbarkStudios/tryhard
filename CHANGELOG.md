@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Changed
-- N/A
+- Moved the `futures` dependency to `dev-dependencies`. MSRV is now 1.48.
 
 ### Deprecated
 - N/A
