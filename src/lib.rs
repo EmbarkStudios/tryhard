@@ -160,7 +160,6 @@
     clippy::match_same_arms,
     clippy::match_wildcard_for_single_variants,
     clippy::mem_forget,
-    clippy::mismatched_target_os,
     clippy::needless_borrow,
     clippy::needless_continue,
     clippy::option_option,
@@ -175,6 +174,7 @@
     clippy::unnested_or_patterns,
     clippy::unused_self,
     clippy::verbose_file_reads,
+    unexpected_cfgs,
     future_incompatible,
     nonstandard_style,
     rust_2018_idioms
