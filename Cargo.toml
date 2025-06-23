@@ -16,10 +16,13 @@ keywords = ["tokio", "futures", "retry"]
 pin-project-lite = "0.2"
 
 [dependencies.tokio]
-package = "tokio"
 version = "1"
 default-features = false
-features = ["rt", "time", "macros", "test-util", "sync"]
+features = ["rt", "time"]
 
 [dev-dependencies]
 futures = "0.3"
+
+[dev-dependencies.tokio]
+version = "1"
+features = ["macros", "sync", "test-util"]
