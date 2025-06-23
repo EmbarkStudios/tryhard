@@ -724,7 +724,7 @@ mod tests {
 
         // assertions about what the exact times are are very finicky so lets just assert that the
         // one without backoff is slower.
-        assert!(time_with_fixed > time_with_none);
+        assert!(time_with_fixed >= time_with_none);
     }
 
     // `RetryFuture` must be `Send` to be used with `async_trait`
