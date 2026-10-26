@@ -657,9 +657,10 @@ impl From<Duration> for RetryPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::convert::Infallible;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
-    use std::{convert::Infallible, time::Instant};
+    use tokio::time::Instant;
 
     #[tokio::test]
     async fn succeed() {
@@ -700,7 +701,7 @@ mod tests {
         assert_eq!(counter.load(Ordering::Relaxed), 1);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn the_backoff_strategy_gets_used() {
         async fn make_future() -> Result<Infallible, &'static str> {
             Err("foo")
@@ -722,8 +723,7 @@ mod tests {
             .unwrap_err();
         let time_with_fixed = start.elapsed();
 
-        // assertions about what the exact times are are very finicky so lets just assert that the
-        // one without backoff is slower.
+        // The paused clock measures backoff delays without including scheduler delays.
         assert!(time_with_fixed >= time_with_none);
     }
 

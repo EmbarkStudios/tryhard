@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A
 
 ### Fixed
-- N/A
+- Use Tokio's paused clock in the backoff strategy test to avoid scheduler-dependent failures.
 
 ### Security
 - N/A
