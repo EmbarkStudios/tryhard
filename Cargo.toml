@@ -19,7 +19,7 @@ pin-project-lite = "0.2"
 package = "tokio"
 version = "1"
 default-features = false
-features = ["rt", "time", "macros", "test-util", "sync"]
+features = ["rt", "time", "macros", "sync"]
 
 [dev-dependencies]
 futures = "0.3"
